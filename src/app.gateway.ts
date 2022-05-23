@@ -4,7 +4,8 @@ import {
   OnGatewayInit,
   WebSocketServer,
   OnGatewayConnection,
-  OnGatewayDisconnect
+  OnGatewayDisconnect,
+  WsResponse
 } from '@nestjs/websockets';
 import { Logger } from "@nestjs/common"
 import { Socket, Server } from "socket.io"
@@ -17,7 +18,9 @@ const max = (a: number, b: number) => {
 }
 interface UserInput {
   input: string;
+  userId: string;
 }
+
 interface Game {
   server: Server;
 
@@ -47,6 +50,10 @@ interface Game {
   paddleTwoY: number;
 
   loop: NodeJS.Timer;
+
+  state: 0 | 1 | 2;
+  players: Array<string>
+  room: string;
 }
 
 interface GameState {
@@ -61,10 +68,14 @@ interface GameState {
 
   paddleTwoX: number;
   paddleTwoY: number;
+
+  state: 0 | 1 | 2;
+  players : Array<string>;
 }
 
 
 class Game {
+
   constructor(server: Server) {
     this.server = server;
 
@@ -92,8 +103,28 @@ class Game {
     this.paddleTwoX = this.width - this.paddleWidth;
     this.paddleTwoY = 0;
 
+    this.state = 0
+
+    this.players = [];
+    this.room = ""
+    //this.run();
   }
 
+  cleanup(): void {
+    clearInterval(this.loop);
+  }
+
+  getPlayers(): Array<string> { return this.players }
+  addPlayer(id: string): void {
+    if (this.players.length < 2)
+      this.players.push(id)
+    if (this.players.length === 2) {
+      this.run();
+      this.toggleGameState();
+    }
+  }
+  setRoomName(name: string): void { this.room = name; }
+  toggleGameState(): void { this.state = (this.state === 0 ? 1 : 2) }
   getGameState(): GameState {
     return {
       ballX: this.ballX,
@@ -105,20 +136,20 @@ class Game {
       paddleOneY: this.paddleOneY,
 
       paddleTwoX: this.paddleTwoX,
-      paddleTwoY: this.paddleTwoY
+      paddleTwoY: this.paddleTwoY,
+
+      state: this.state,
+      players : this.players
     }
   }
-
   async run() {
     let fps: number = 60;
     this.loop = setInterval(() => {
-      //console.log("slept "+1000/fps+" y=", this.paddleOneY);
-
       this.updateBall();
       this.handlePaddleOneBounce();
-      this.server.emit("gameState", this.getGameState());
+      this.handlePaddleTwoBounce();
+      this.server.to(this.room).emit("gameState", this.getGameState());
     }, 1000 / fps);
-
   }
   updateBall() {
     //update
@@ -152,25 +183,52 @@ class Game {
       this.paddleOneY = max(this.paddleOneY, 0);
     }
   }
-  handlePaddleOneBounce (){
-  
+  updatePaddleTwo(dir: string) {
+
+    if (dir === "DOWN") {
+      this.paddleTwoY += this.paddleSpeed;
+      this.paddleTwoY = min(this.paddleTwoY, this.height - this.paddleHeight);
+    }
+    else {
+      this.paddleTwoY -= this.paddleSpeed;
+      this.paddleTwoY = max(this.paddleTwoY, 0);
+    }
+  }
+  handlePaddleOneBounce() {
+
     if (
-         this.ballDirX === -1 
+      this.ballDirX === -1
       && this.ballY > this.paddleOneY
       && this.ballY < this.paddleOneY + this.paddleHeight // ball in front of paddle and going toward paddle
-    ){
+    ) {
       // console.log("in paddle one range")
-      this.ballX = max(this.ballX, this.ballRadius/2 + this.paddleWidth);
-      if (this.ballX - this.ballRadius/2 - this.paddleWidth <= 0)
+      this.ballX = max(this.ballX, this.ballRadius / 2 + this.paddleWidth);
+      if (this.ballX - this.ballRadius / 2 - this.paddleWidth <= 0)
+        this.ballDirX *= -1;
+    }
+  }
+  handlePaddleTwoBounce() {
+
+    if (
+      this.ballDirX === 1
+      && this.ballY > this.paddleTwoY
+      && this.ballY < this.paddleTwoY + this.paddleHeight // ball in front of paddle and going toward paddle
+    ) {
+      // console.log("in paddle two range")
+
+      this.ballX = min(this.ballX, this.width - this.ballRadius / 2 - this.paddleWidth);
+
+      if (this.ballX + this.ballRadius / 2 + this.paddleWidth >= this.width)
         this.ballDirX *= -1;
     }
   }
   handleInput(payload: UserInput) {
-    this.updatePaddleOne(payload.input);
+    if (payload.userId === this.players[0])
+      this.updatePaddleOne(payload.input);
+    else
+      this.updatePaddleTwo(payload.input);
 
   }
-
-
 }
 
 @WebSocketGateway(
@@ -186,31 +244,70 @@ export class AppGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   private logger: Logger = new Logger("AppGateway");
 
   //game object
-  private game: Game;
+  private games: Array<Game> = Array<Game>();
+  private playerToGameIdx: Map<string, number> = new Map<string, number>();
 
-  @SubscribeMessage('msgToServer')
-  handleMessage(client: any, payload: any): void {
-    this.server.emit("msgToClient", payload);
-  }
-
-
-
-  async afterInit(server: Server): Promise<void> {
+  afterInit(server: Server): void {
+    this.server = server;
     this.logger.log("Init");
-    this.game = new Game(server);
-    this.game.run()
   }
 
   handleConnection(client: Socket, ...args: any[]): void {
     this.logger.log("Client Connected :" + client.id);
+
   }
   handleDisconnect(client: Socket): void {
     this.logger.log("Client Disconnected :" + client.id);
+
+    if (this.playerToGameIdx.has(client.id)) {
+      console.log("game idx ", this.playerToGameIdx.get(client.id))
+      this.games[this.playerToGameIdx.get(client.id)].toggleGameState()
+      //this.games.slice(this.playerToGameIdx.get(client.id), 1);
+      this.playerToGameIdx.delete(client.id);
+    }
   }
 
-  @SubscribeMessage('playerOne')
-  handlePlayerOneInput(client: Socket, payload: UserInput): void {
-    this.game.handleInput(payload)
+  @SubscribeMessage('playerJoined')
+  joinRoom(socket: Socket): void {
+    const roomName: string = socket.id;
+    console.log(roomName)
+    if (this.playerToGameIdx.has(socket.id)) {
+      console.log(this.games[this.playerToGameIdx[socket.id]].getPlayers())
+      if (this.games[this.playerToGameIdx[socket.id]].getPlayers().length == 2)
+        this.games[this.playerToGameIdx[socket.id]].toggleGameState()
+      return;
+    }
+
+    if (this.games.length) {
+      if (this.games[this.games.length - 1].getPlayers().length < 2) {
+        this.games[this.games.length - 1].addPlayer(socket.id);
+        socket.join(this.games[this.games.length - 1].room);
+        console.log("Joined game idx=" + (this.games.length - 1), roomName); // not this room
+      }
+      else {
+        this.games.push(new Game(this.server));
+        this.games[this.games.length - 1].addPlayer(socket.id);
+        this.games[this.games.length - 1].setRoomName(roomName);
+        socket.join(roomName);
+        console.log("Created game idx=" + (this.games.length - 1), roomName)
+      }
+    }
+    else {
+      this.games.push(new Game(this.server));
+      this.games[0].addPlayer(socket.id);
+      this.games[0].setRoomName(roomName);
+      socket.join(roomName);
+      console.log("created game idx=" + 0, roomName)
+    }
+
+    this.playerToGameIdx.set(socket.id, this.games.length - 1);
+  }
+
+  @SubscribeMessage('playerInput')
+  handlePlayerInput(client: Socket, payload: UserInput): void {
+
+    this.games[this.playerToGameIdx.get(client.id)].handleInput({ ...payload, userId: client.id })
+
     //this.logger.log("Player One going " + payload.input + " new y =" + this.game.paddleOneY)
 
     //this.server.emit("msgToClient", payload);
