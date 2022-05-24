@@ -3,19 +3,24 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { ConfigService } from '@nestjs/config';
+import { ValidationPipe } from '@nestjs/common';
+
 import { AppModule } from './app.module';
-import { join } from 'path';
-import * as fst from "@fastify/static"
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(
+  const app : NestFastifyApplication = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter()
     );
-    app.useStaticAssets({
-      root :join(__dirname, '..', 'static')
-    });
 
-  await app.listen(process.env.PORT || 3001,"0.0.0.0");
+    const config: ConfigService = app.get(ConfigService);
+    const port: number = config.get<number>('PORT');
+
+    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  await app.listen(port ,"0.0.0.0",() => {
+    console.log('[WEB]', `http://localhost:${port}`);
+  });
 }
 bootstrap();
