@@ -124,7 +124,10 @@ class Game {
     }
   }
   setRoomName(name: string): void { this.room = name; }
-  toggleGameState(): void { this.state = (this.state === 0 ? 1 : 2) }
+  toggleGameState(): void {
+    this.state = (this.state === 0 ? 1 : 2)
+    if (this.state === 2) this.cleanup();
+  }
   getGameState(): GameState {
     return {
       ballX: this.ballX,
@@ -149,6 +152,7 @@ class Game {
       this.handlePaddleOneBounce();
       this.handlePaddleTwoBounce();
       this.server.to(this.room).emit("gameState", this.getGameState());
+
     }, 1000 / fps);
   }
   updateBall() {
@@ -227,7 +231,6 @@ class Game {
       this.updatePaddleOne(payload.input);
     else
       this.updatePaddleTwo(payload.input);
-
   }
 }
 

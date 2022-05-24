@@ -6,6 +6,7 @@ import {
 import { AppModule } from './app.module';
 import { join } from 'path';
 import * as fst from "@fastify/static"
+
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
@@ -15,6 +16,6 @@ async function bootstrap() {
       root :join(__dirname, '..', 'static')
     });
 
-  await app.listen(process.env.PORT || 3001);
+  await app.listen(process.env.PORT || 3001,"0.0.0.0");
 }
 bootstrap();
