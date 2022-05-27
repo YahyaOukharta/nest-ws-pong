@@ -11,8 +11,13 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app : NestFastifyApplication = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter()
-    );
+    new FastifyAdapter(),
+    {
+      cors: {
+        origin: 'http://localhost:3000',///
+      }
+    }
+  );
 
     const config: ConfigService = app.get(ConfigService);
     const port: number = config.get<number>('PORT');
