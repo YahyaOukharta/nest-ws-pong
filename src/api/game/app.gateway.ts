@@ -70,7 +70,7 @@ interface GameState {
   paddleTwoY: number;
 
   state: 0 | 1 | 2;
-  players : Array<string>;
+  players: Array<string>;
 }
 
 
@@ -111,6 +111,7 @@ class Game {
   }
 
   cleanup(): void {
+    this.emitState();
     clearInterval(this.loop);
   }
 
@@ -142,17 +143,19 @@ class Game {
       paddleTwoY: this.paddleTwoY,
 
       state: this.state,
-      players : this.players
+      players: this.players
     }
   }
+  async emitState() {
+    this.server.to(this.room).emit("gameState", this.getGameState());
+  }
   async run() {
-    let fps: number = 60;
+    const fps = 60;
     this.loop = setInterval(() => {
       this.updateBall();
       this.handlePaddleOneBounce();
       this.handlePaddleTwoBounce();
-      this.server.to(this.room).emit("gameState", this.getGameState());
-
+      this.emitState();
     }, 1000 / fps);
   }
   updateBall() {
