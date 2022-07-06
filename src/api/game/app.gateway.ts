@@ -25,6 +25,7 @@ interface Game {
   server: Server;
 
   //Constants
+  aspectRatio: number;
   width: number;
   height: number;
 
@@ -73,14 +74,30 @@ interface GameState {
   players: Array<string>;
 }
 
+/**
+ * TODO:
+ * 3 game modes
+ * aspect ratio : 2 / 3
+ * height = aspect ratio * width
+ * 
+ * absolute width 1000;
+ * relative width 100%
+ * 
+ * absolute X = 720
+ * relative X = 720 / absolute width * 100
+ */ 
 
 class Game {
 
   constructor(server: Server) {
     this.server = server;
 
+    
+    this.aspectRatio = 16/9
     this.width = 1000;
-    this.height = 700;
+
+
+    this.height = this.width / this.aspectRatio;
 
     this.initBallX = this.width / 2;
     this.initBallY = this.height / 2;
