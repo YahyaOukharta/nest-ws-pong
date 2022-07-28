@@ -10,11 +10,16 @@ import { Socket, Server } from 'socket.io';
 import { AuthGuard } from './app.guard';
 import { AuthService, User } from './app.service';
 
-import { ClassicGame } from './modes';
+import { ClassicGame, DoublePaddle, GoalKeeper } from './modes';
+
+import { assert } from 'console';
 
 interface UserInput {
   input: string;
   userId: string;
+}
+interface PlayerJoinedPayload{
+  mode : string; // game mode
 }
 interface AuthenticatedSocket extends Socket {
   user: User;
@@ -26,6 +31,13 @@ interface AuthenticatedSocket extends Socket {
   cors: {
     origin: ['http://localhost','http://localhost:8000'],
     credentials: true,
+  },
+  async allowRequest(req, fn) {
+    const authService: AuthService = new AuthService();
+    const user = await authService.isAuthenticated(req.headers.cookie);
+    if (!user) return fn(new Error("Unauthorized"), false);
+    req.user = user;
+    return fn(null, true);
   },
   
 })
@@ -41,13 +53,13 @@ export class AppGateway
 
   //game object
   private games: Array<ClassicGame> = Array<ClassicGame>();
+  private gameModeToLatestGameIdx: Map<string, number> = new Map<string, number>();
   private userIdToGameIdx: Map<string, number> = new Map<string, number>();
   private socketToUserId: Map<string, string> = new Map<string, string>();
   private userIdToTimeout: Map<string, NodeJS.Timeout> = new Map<
     string,
     NodeJS.Timeout
   >();
-  private authenticatedSockets: Array<string> = Array<string>();
 
   afterInit(server: Server): void {
     this.server = server;
@@ -62,34 +74,31 @@ export class AppGateway
   }
 
   async handleConnection(client: Socket): Promise<void> {
-    const cookie = client.handshake.headers.cookie;
-    const user = await this.authService.isAuthenticated(cookie);
-    if (!user) return client.conn.close(true);
 
-    this.logger.log('Client Connected :' + user.username, client.id);
+    const user = (client.request as any).user;
+    //console.log(user)
+    this.logger.log('Client Connected :' + user.login + " " + client.id);
 
-    this.authenticatedSockets.push(client.id);
-    const oldSock = this.getByValue(this.socketToUserId, user.ftId);
+    const oldSock = this.getByValue(this.socketToUserId, user.uid);
     if (oldSock != undefined) {
       // userId was already connected
-      console.log('user ' + user.username + ' has an old socket');
-      if (this.userIdToGameIdx.has(user.ftId)) {
+      console.log('user ' + user.login + ' has an old socket');
+      if (this.userIdToGameIdx.has(user.uid)) {
         console.log('clearing timeout');
-        clearTimeout(this.userIdToTimeout.get(user.ftId));
-        this.userIdToTimeout.delete(user.ftId);
+        clearTimeout(this.userIdToTimeout.get(user.uid));
+        this.userIdToTimeout.delete(user.uid);
 
-        this.games[this.userIdToGameIdx.get(user.ftId)].replacePlayer(
+        this.games[this.userIdToGameIdx.get(user.uid)].replacePlayer(
           oldSock,
           client.id,
         );
-        const g: ClassicGame = this.games[this.userIdToGameIdx.get(user.ftId)];
-
+        const g: ClassicGame = this.games[this.userIdToGameIdx.get(user.uid)];
         console.log(
-          'user ' + user.username + ' has a game',
+          'user ' + user.login + ' has a game',
           g.state,
           g.players,
         );
-        client.join(this.games[this.userIdToGameIdx.get(user.ftId)].room);
+        client.join(this.games[this.userIdToGameIdx.get(user.uid)].room);
 
         const opponent: string =
           g.players[(g.players.indexOf(client.id) + 1) % 2];
@@ -98,40 +107,33 @@ export class AppGateway
         if (this.userIdToTimeout.has(this.socketToUserId.get(opponent))) {
           console.log(
             'user ' +
-              user.username +
+              user.login +
               ' disconnected and reconnected found oponnent disconnected',
             g.state,
             g.players,
           );
-          this.games[this.userIdToGameIdx.get(user.ftId)].setState(4);
+          this.games[this.userIdToGameIdx.get(user.uid)].setState(4);
         } else if (
-          this.games[this.userIdToGameIdx.get(user.ftId)].done ||
-          this.games[this.userIdToGameIdx.get(user.ftId)].gameOver()
+          this.games[this.userIdToGameIdx.get(user.uid)].done ||
+          this.games[this.userIdToGameIdx.get(user.uid)].gameOver()
         ) {
-          this.userIdToGameIdx.delete(user.ftId);
+          this.userIdToGameIdx.delete(user.uid);
         } else {
-          this.games[this.userIdToGameIdx.get(user.ftId)].setTimeout(0);
-          this.games[this.userIdToGameIdx.get(user.ftId)].setState(3);
-          this.games[this.userIdToGameIdx.get(user.ftId)].init();
+          this.games[this.userIdToGameIdx.get(user.uid)].setTimeout(0);
+          this.games[this.userIdToGameIdx.get(user.uid)].setState(3);
+          this.games[this.userIdToGameIdx.get(user.uid)].init();
         }
       }
     }
     this.socketToUserId.delete(oldSock);
-    this.socketToUserId.set(client.id, user.ftId);
+    this.socketToUserId.set(client.id, user.uid);
     client.emit('authenticated');
 
-    console.log('authenticated sockets', this.authenticatedSockets.length);
   }
 
   async handleDisconnect(client: Socket): Promise<void> {
-    if (!this.authenticatedSockets.includes(client.id)) return;
-    this.authenticatedSockets.splice(
-      this.authenticatedSockets.indexOf(client.id),
-      1,
-    );
 
     this.logger.log('Client Disconnected :' + client.id);
-    console.log('authenticated sockets', this.authenticatedSockets.length);
 
     const userId = this.socketToUserId.get(client.id);
     if (this.userIdToGameIdx.has(userId)) {
@@ -143,6 +145,8 @@ export class AppGateway
         this.games[this.userIdToGameIdx.get(userId)].setState(4);
         this.userIdToGameIdx.delete(userId);
         this.socketToUserId.delete(client.id);
+        console.log("player left game mode",this.getByValue(this.gameModeToLatestGameIdx, this.userIdToGameIdx.get(userId)))
+        this.gameModeToLatestGameIdx.delete(this.getByValue(this.gameModeToLatestGameIdx, this.userIdToGameIdx.get(userId)));
       } else if (
         !(
           this.games[this.userIdToGameIdx.get(userId)].done ||
@@ -171,7 +175,7 @@ export class AppGateway
             }
 
             let p = this.games[this.userIdToGameIdx.get(userId)].players;
-
+            if(!this.games[this.userIdToGameIdx.get(userId)].winner)
             this.games[this.userIdToGameIdx.get(userId)].winner =
               p[(p.indexOf(client.id) + 1) % 2];
             console.log(
@@ -214,49 +218,95 @@ export class AppGateway
       console.log('cleared everything');
     }
   }
-
+  private newGame(server: Server, gameMode: string) : ClassicGame | null{
+    switch(gameMode.toLowerCase()){
+      case "classic":
+        console.log("new Classic")
+        return new ClassicGame(server);
+      case "doublepaddle":
+        console.log("new DoublePaddle")
+        return new DoublePaddle(server);
+      case "goalkeeper":
+        console.log("new GoalKeeper")
+        return new GoalKeeper(server);
+      default:
+        return null;
+    }
+  }
   @SubscribeMessage('playerJoined')
-  joinRoom(socket: AuthenticatedSocket): void {
+  onPlayerJoined(socket: AuthenticatedSocket, payload : PlayerJoinedPayload): void {
     // console.log("playerJoined", this.authenticatedSockets, socket.id, this.authenticatedSockets.includes(socket.id));
-    if (!this.authenticatedSockets.includes(socket.id)) return;
     const userId = this.socketToUserId.get(socket.id);
 
+    console.log(payload);
     if (this.userIdToGameIdx.has(userId)) {
-      return;
+      if (this.games[this.userIdToGameIdx.get(userId)].mode.toLowerCase() != payload.mode.toLowerCase()){
+        let p = this.games[this.userIdToGameIdx.get(userId)].players;
+        if(!this.games[this.userIdToGameIdx.get(userId)].winner)
+        this.games[this.userIdToGameIdx.get(userId)].winner =
+          p[(p.indexOf(socket.id) + 1) % 2];
+        console.log(
+          'winner is',
+          p[(p.indexOf(socket.id) + 1) % 2],
+          p.indexOf(socket.id),
+        );
+
+        this.games[this.userIdToGameIdx.get(userId)].setState(4);
+        this.games[this.userIdToGameIdx.get(userId)].players = ['-1', '-1']; //.push('-1');
+        this.games[this.userIdToGameIdx.get(userId)].setDone(true);
+        this.userIdToGameIdx.delete(this.socketToUserId.get(p[0]));
+        this.userIdToGameIdx.delete(this.socketToUserId.get(p[1]));
+
+        //this.socketToUserId.delete(client.id);
+        this.userIdToTimeout.delete(userId);
+      }
+      else return;
     }
     //console.log(socket.user);
 
     const roomName: string = socket.id;
     console.log(roomName);
 
-    // if (this.userIdToGameIdx.has(socket.id)) {
-    //   console.log(this.games[this.userIdToGameIdx[socket.id]].getPlayers());
-    //   if (this.games[this.userIdToGameIdx[socket.id]].getPlayers().length == 2)
-    //     this.games[this.userIdToGameIdx[socket.id]].toggleGameState();
-    //   return;
-    // }
+    const ltsIdx = this.gameModeToLatestGameIdx.get(payload.mode);
 
     if (this.games.length) {
-      if (this.games[this.games.length - 1].getPlayers().length < 2) {
-        this.games[this.games.length - 1].addPlayer(socket.id);
-        socket.join(this.games[this.games.length - 1].room);
-        console.log('Joined game idx=' + (this.games.length - 1), roomName); // not this room
+      console.log(ltsIdx)
+      if (ltsIdx != undefined && this.games[ltsIdx].getPlayers().length < 2) {
+        this.games[ltsIdx].addPlayer(socket.id);
+        socket.join(this.games[ltsIdx].room);
+        console.log('Joined game idx=' + (ltsIdx), roomName); // not this room
+        this.userIdToGameIdx.set(userId, ltsIdx);
+        this.gameModeToLatestGameIdx.delete(payload.mode);
+
       } else {
-        this.games.push(new ClassicGame(this.server));
+        const g = this.newGame(this.server, payload.mode)
+        if(!g)return 
+
+        this.games.push(g);
         this.games[this.games.length - 1].addPlayer(socket.id);
         this.games[this.games.length - 1].setRoomName(roomName);
         socket.join(roomName);
         console.log('Created game idx=' + (this.games.length - 1), roomName);
+
+        this.userIdToGameIdx.set(userId, this.games.length - 1);
+        this.gameModeToLatestGameIdx.set(payload.mode, this.games.length - 1);
+
+
       }
     } else {
-      this.games.push(new ClassicGame(this.server));
+      const g = this.newGame(this.server, payload.mode)
+      if(!g)return
+
+      this.games.push(g);
       this.games[0].addPlayer(socket.id);
       this.games[0].setRoomName(roomName);
       socket.join(roomName);
       console.log('created game idx=' + 0, roomName);
+      this.gameModeToLatestGameIdx.set(payload.mode, this.games.length - 1)
+      this.userIdToGameIdx.set(userId, this.games.length - 1);
     }
 
-    this.userIdToGameIdx.set(userId, this.games.length - 1);
+    //this.userIdToGameIdx.set(userId, this.games.length - 1);
   }
 
   @SubscribeMessage('playerInput')
