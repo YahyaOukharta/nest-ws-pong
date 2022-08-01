@@ -1,4 +1,5 @@
 import { Server } from 'socket.io';
+import {Game, UserInput, GameState} from "./Types"
 
 const min = (a: number, b: number) => {
   return a < b ? a : b;
@@ -6,110 +7,6 @@ const min = (a: number, b: number) => {
 const max = (a: number, b: number) => {
   return a > b ? a : b;
 };
-interface UserInput {
-  input: string;
-  userId: string;
-}
-
-export class Game {
-  server: Server;
-
-
-  mode : string; // game mode
-  //Constants
-  aspectRatio: number;
-  width: number;
-  height: number;
-
-  initBallX: number;
-  initBallY: number;
-  ballRadius: number;
-  ballSpeed: number;
-
-  paddleWidth: number;
-  paddleHeight: number;
-  paddleSpeed: number;
-
-  // Game variables
-  ballX: number;
-  ballY: number;
-  ballDirX: number;
-  ballDirY: number;
-
-  paddleOneX: number;
-  paddleOneY: number;
-
-  paddleTwoX: number;
-  paddleTwoY: number;
-
-  loop: NodeJS.Timer;
-
-  state: 0 | 1 | 2 | 3 | 4;
-  /*
-  0 // queue mode 
-  1 // waiting for player to start 
-  2   // playing 
-        // player left (timeout before forfait)
-  3   // outcome + ( next round(waiting for player to start) || ?? )
-        // player doesnt start next round (timeout before forfait)
-  4 // final outcome 
-      // play again (back to queue)
-      // ask for rematch ?? if still there 
-
-  */
-  players: Array<string>;
-  scores: Array<number>;
-  maxScore: number;
-
-  room: string;
-
-  done : boolean;
-  timeout : number; // for no timeout // time player left game 
-  timeoutPeriodInSeconds : number; 
-
-  winner : string | undefined;
-}
-
-interface GameState {
-  mode:string; //gamemode
-
-  // Window dimensions
-  aspectRatio: number;
-  width: number;
-  height: number;
-
-  //ball
-  ballX: number;
-  ballY: number;
-  ballDirX: number;
-  ballDirY: number;
-  ballSpeed: number;
-  ballRadius: number;
-
-  //paddle
-  paddleWidth: number;
-  paddleHeight: number;
-  paddleSpeed: number;
-  paddleOneX: number;
-  paddleOneY: number;
-  paddleTwoX: number;
-  paddleTwoY: number;
-
-  state: 0 | 1 | 2 | 3 | 4;
-
-  scores: Array<number>;
-  maxScore : number;
-  players: Array<string>;
-  timestamp: number;
-
-  done: boolean;
-
-  winner : string;
-
-  timeout : number; // 0 for no timeout // time player left game 
-  timeoutPeriodInSeconds : number; 
-
-}
 
 export class ClassicGame extends Game {
   constructor(server: Server) {
@@ -124,7 +21,7 @@ export class ClassicGame extends Game {
 
     this.initBallX = this.width / 2;
     this.initBallY = this.height / 2;
-    this.ballRadius = 50;
+    this.ballRadius = 25;
     this.ballSpeed = 10;
     this.ballX = this.initBallX;
     this.ballY = this.initBallY;
@@ -132,7 +29,7 @@ export class ClassicGame extends Game {
     this.ballDirY = -1;
 
     this.paddleWidth = 30;
-    this.paddleHeight = 800;
+    this.paddleHeight = 100;
     this.paddleSpeed = 5;
     this.paddleOneX = 0;
     this.paddleOneY = 0;
@@ -151,6 +48,9 @@ export class ClassicGame extends Game {
     this.timeoutPeriodInSeconds = 5; 
 
     this.winner = "";
+
+    this.gameModeConfig = null;
+
     //this.run();
   }
   init() {
@@ -226,6 +126,9 @@ export class ClassicGame extends Game {
 
       timeout: this.timeout,
       timeoutPeriodInSeconds: this.timeoutPeriodInSeconds,
+
+      gameModeConfig: this.gameModeConfig,
+
     };
   }
   async emitState() {
@@ -261,21 +164,21 @@ export class ClassicGame extends Game {
 
     //no overlap ?
     if (this.ballDirX > 0)
-      this.ballX = min(this.ballX, this.width - this.ballRadius / 2);
-    else this.ballX = max(this.ballX, this.ballRadius / 2);
+      this.ballX = min(this.ballX, this.width - this.ballRadius);
+    else this.ballX = max(this.ballX, this.ballRadius);
     if (this.ballDirY > 0)
-      this.ballY = min(this.ballY, this.height - this.ballRadius / 2);
-    else this.ballY = max(this.ballY, this.ballRadius / 2);
+      this.ballY = min(this.ballY, this.height - this.ballRadius);
+    else this.ballY = max(this.ballY, this.ballRadius);
 
     //collision
     if (
-      this.ballX + this.ballRadius / 2 >= this.width ||
-      this.ballX - this.ballRadius / 2 <= 0
+      this.ballX + this.ballRadius >= this.width ||
+      this.ballX - this.ballRadius <= 0
     ) {
       this.ballDirX *= -1;
 
-      if (this.ballX + this.ballRadius / 2 >= this.width) this.scores[0] += 1; // +1 playerOne
-      if (this.ballX - this.ballRadius / 2 <= 0) this.scores[1] += 1; // +1 playerTwo
+      if (this.ballX + this.ballRadius >= this.width) this.scores[0] += 1; // +1 playerOne
+      if (this.ballX - this.ballRadius <= 0) this.scores[1] += 1; // +1 playerTwo
       if (!this.gameOver()) {
         this.state = 3; // waiting for player to start the game
         this.init();
@@ -284,8 +187,8 @@ export class ClassicGame extends Game {
       //this.cleanup(); // pause loop
     }
     if (
-      this.ballY + this.ballRadius / 2 >= this.height ||
-      this.ballY - this.ballRadius / 2 <= 0
+      this.ballY + this.ballRadius >= this.height ||
+      this.ballY - this.ballRadius <= 0
     )
       this.ballDirY *= -1;
   }
@@ -314,8 +217,8 @@ export class ClassicGame extends Game {
       this.ballY < this.paddleOneY + this.paddleHeight // ball in front of paddle and going toward paddle
     ) {
       // console.log("in paddle one range")
-      this.ballX = max(this.ballX, this.ballRadius / 2 + this.paddleWidth);
-      if (this.ballX - this.ballRadius / 2 - this.paddleWidth <= 0)
+      this.ballX = max(this.ballX, this.ballRadius + this.paddleWidth);
+      if (this.ballX - this.ballRadius - this.paddleWidth <= 0)
         this.ballDirX *= -1;
     } else if (
       //vertical intersection, ball going down
@@ -325,8 +228,8 @@ export class ClassicGame extends Game {
       this.ballX < this.paddleOneX + this.paddleWidth && // ball in front of paddle and going toward paddle
       this.ballY < this.paddleOneY + this.paddleHeight / 2
     ) {
-      this.ballY = min(this.ballY, this.paddleOneY - this.ballRadius / 2);
-      if (this.ballY + this.ballRadius / 2 >= this.paddleOneY)
+      this.ballY = min(this.ballY, this.paddleOneY - this.ballRadius);
+      if (this.ballY + this.ballRadius >= this.paddleOneY)
         this.ballDirY *= -1;
     } else if (
       //vertical intersection, ball going up
@@ -338,10 +241,10 @@ export class ClassicGame extends Game {
     ) {
       this.ballY = max(
         this.ballY,
-        this.paddleOneY + this.paddleHeight + this.ballRadius / 2,
+        this.paddleOneY + this.paddleHeight + this.ballRadius,
       );
       if (
-        this.ballY - this.ballRadius / 2 <=
+        this.ballY - this.ballRadius <=
         this.paddleOneY + this.paddleHeight
       )
         this.ballDirY *= -1;
@@ -356,9 +259,9 @@ export class ClassicGame extends Game {
     ) {
       this.ballX = min(
         this.ballX,
-        this.width - this.ballRadius / 2 - this.paddleWidth,
+        this.width - this.ballRadius - this.paddleWidth,
       );
-      if (this.ballX + this.ballRadius / 2 + this.paddleWidth >= this.width)
+      if (this.ballX + this.ballRadius + this.paddleWidth >= this.width)
         this.ballDirX *= -1;
     } else if (
       //vertical intersection, ball going down
@@ -368,8 +271,8 @@ export class ClassicGame extends Game {
       this.ballX < this.paddleTwoX + this.paddleWidth && // ball in front of paddle and going toward paddle
       this.ballY < this.paddleTwoY + this.paddleHeight / 2
     ) {
-      this.ballY = min(this.ballY, this.paddleTwoY - this.ballRadius / 2);
-      if (this.ballY + this.ballRadius / 2 >= this.paddleTwoY)
+      this.ballY = min(this.ballY, this.paddleTwoY - this.ballRadius);
+      if (this.ballY + this.ballRadius >= this.paddleTwoY)
         this.ballDirY *= -1;
     } else if (
       //vertical intersection, ball going up
@@ -381,10 +284,10 @@ export class ClassicGame extends Game {
     ) {
       this.ballY = max(
         this.ballY,
-        this.paddleTwoY + this.paddleHeight + this.ballRadius / 2,
+        this.paddleTwoY + this.paddleHeight + this.ballRadius,
       );
       if (
-        this.ballY - this.ballRadius / 2 <=
+        this.ballY - this.ballRadius <=
         this.paddleTwoY + this.paddleHeight
       )
         this.ballDirY *= -1;
