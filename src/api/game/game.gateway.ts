@@ -8,11 +8,12 @@ import {
 import { Inject, Logger, UseGuards } from '@nestjs/common';
 import { Socket, Server } from 'socket.io';
 import { AuthGuard } from './app.guard';
-import { AuthService, User } from './app.service';
+import { AuthService, User } from './auth.service';
 
 import { ClassicGame, DoublePaddle, GoalKeeper } from './modes';
 
 import { assert } from 'console';
+import { GameService } from './game.service';
 
 interface UserInput {
   input: string;
@@ -47,6 +48,7 @@ export class AppGateway
 {
   constructor(
     @Inject('AUTH_SERVICE') private readonly authService: AuthService,
+    @Inject('GAME_SERVICE') private readonly gameService: GameService,
   ) {}
   private server: Server;
   private logger: Logger = new Logger('AppGateway');
@@ -119,9 +121,15 @@ export class AppGateway
         ) {
           this.userIdToGameIdx.delete(user.uid);
         } else {
-          this.games[this.userIdToGameIdx.get(user.uid)].setTimeout(0);
-          this.games[this.userIdToGameIdx.get(user.uid)].setState(3);
-          this.games[this.userIdToGameIdx.get(user.uid)].init();
+          console.log("rejoin timeout")
+            this.userIdToTimeout.set(user.uid, setTimeout(()=>{
+              if(this.userIdToGameIdx.has(user.uid) && this.games[this.userIdToGameIdx.get(user.uid)] != undefined)
+              {
+                this.games[this.userIdToGameIdx.get(user.uid)].setTimeout(0);
+                this.games[this.userIdToGameIdx.get(user.uid)].setState(3);
+                this.games[this.userIdToGameIdx.get(user.uid)].init();
+              }
+            },2000))
         }
       }
     }
@@ -164,9 +172,16 @@ export class AppGateway
         //setting timeout
         this.games[this.userIdToGameIdx.get(userId)].setTimeout(Date.now());
         const timeoutPeriod = g.timeoutPeriodInSeconds * 1e3;
+        console.log("quit again timeout")
+
+        if(this.userIdToTimeout.has(userId)){
+           clearTimeout(this.userIdToTimeout.get(userId));
+           console.log("quit again timeout")
+        }
+
         this.userIdToTimeout.set(
           userId,
-          setTimeout(() => {
+          setTimeout(async () => {
             if (!this.userIdToGameIdx.has(userId)) {
               console.log('timeout reached but game over');
               this.userIdToGameIdx.delete(userId);
@@ -189,7 +204,14 @@ export class AppGateway
             this.games[this.userIdToGameIdx.get(userId)].setDone(true);
             this.userIdToGameIdx.delete(this.socketToUserId.get(p[0]));
             this.userIdToGameIdx.delete(this.socketToUserId.get(p[1]));
-
+            //creating game on db
+            await this.gameService.updateGame(client.request.headers.cookie, g.room, 
+              {
+                scoreOne:g.scores[0],
+                scoreTwo:g.scores[1],
+                status:1, // done
+                winner: (g.winner ? this.socketToUserId.get(g.winner) : null),
+              });
             //this.socketToUserId.delete(client.id);
             this.userIdToTimeout.delete(userId);
             // this.games[this.userIdToGameIdx.get(userId)].setTimeout(userId, false);
@@ -205,8 +227,18 @@ export class AppGateway
         );
         //this.userIdToGameIdx.delete(userId);
       } else {
-        this.games[this.userIdToGameIdx.get(userId)].setDone(true);
+        const idx = this.userIdToGameIdx.get(userId)
+        this.games[idx].setDone(true);
+
         this.userIdToGameIdx.delete(userId);
+        //updating game on db
+        await this.gameService.updateGame(client.request.headers.cookie, this.games[idx].room, 
+          {
+            scoreOne:this.games[idx].scores[0],
+            scoreTwo:this.games[idx].scores[1],
+            status:1, // done
+            winner:(this.games[idx].winner ? this.socketToUserId.get(this.games[idx].winner) : null),
+          });
       }
     }
 
@@ -234,14 +266,15 @@ export class AppGateway
     }
   }
   @SubscribeMessage('playerJoined')
-  onPlayerJoined(socket: AuthenticatedSocket, payload : PlayerJoinedPayload): void {
+  async onPlayerJoined(socket: AuthenticatedSocket, payload : PlayerJoinedPayload): Promise<void> {
     // console.log("playerJoined", this.authenticatedSockets, socket.id, this.authenticatedSockets.includes(socket.id));
     const userId = this.socketToUserId.get(socket.id);
 
     console.log(payload);
     if (this.userIdToGameIdx.has(userId)) {
       if (this.games[this.userIdToGameIdx.get(userId)].mode.toLowerCase() != payload.mode.toLowerCase()){
-        let p = this.games[this.userIdToGameIdx.get(userId)].players;
+        let g = this.games[this.userIdToGameIdx.get(userId)]
+        let p = g.players;
         if(!this.games[this.userIdToGameIdx.get(userId)].winner)
         this.games[this.userIdToGameIdx.get(userId)].winner =
           p[(p.indexOf(socket.id) + 1) % 2];
@@ -257,6 +290,15 @@ export class AppGateway
         this.userIdToGameIdx.delete(this.socketToUserId.get(p[0]));
         this.userIdToGameIdx.delete(this.socketToUserId.get(p[1]));
 
+        //creating game on db
+        await this.gameService.updateGame(socket.request.headers.cookie, g.room, 
+          {
+            scoreOne:g.scores[0],
+            scoreTwo:g.scores[1],
+            status:1, // done
+            winner: (g.winner ? this.socketToUserId.get(g.winner) : null),
+
+          });
         //this.socketToUserId.delete(client.id);
         this.userIdToTimeout.delete(userId);
       }
@@ -271,19 +313,32 @@ export class AppGateway
 
     if (this.games.length) {
       console.log(ltsIdx)
-      if (ltsIdx != undefined && this.games[ltsIdx].getPlayers().length < 2) {
-        this.games[ltsIdx].addPlayer(socket.id);
+      if (ltsIdx != undefined && this.games[ltsIdx] != undefined && this.games[ltsIdx].getPlayers().length < 2) {
+        this.games[ltsIdx].addPlayer(socket.id,(socket.request as any).user);
         socket.join(this.games[ltsIdx].room);
         console.log('Joined game idx=' + (ltsIdx), roomName); // not this room
         this.userIdToGameIdx.set(userId, ltsIdx);
         this.gameModeToLatestGameIdx.delete(payload.mode);
+        const g = this.games[ltsIdx];
+
+        //creating game on db
+        await this.gameService.newGame(socket.request.headers.cookie, 
+          {
+            gameId:g.room,
+            mode:(g.mode as "classic" | "doublepaddle" | "goalkeeper"),
+            playerOne:g.playerData[0].uid,
+            playerTwo:g.playerData[1].uid,
+            scoreOne:0,
+            scoreTwo:0,
+            status:0,
+          });
 
       } else {
         const g = this.newGame(this.server, payload.mode)
         if(!g)return 
 
         this.games.push(g);
-        this.games[this.games.length - 1].addPlayer(socket.id);
+        this.games[this.games.length - 1].addPlayer(socket.id,(socket.request as any).user);
         this.games[this.games.length - 1].setRoomName(roomName);
         socket.join(roomName);
         console.log('Created game idx=' + (this.games.length - 1), roomName);
@@ -298,7 +353,7 @@ export class AppGateway
       if(!g)return
 
       this.games.push(g);
-      this.games[0].addPlayer(socket.id);
+      this.games[0].addPlayer(socket.id,(socket.request as any).user);
       this.games[0].setRoomName(roomName);
       socket.join(roomName);
       console.log('created game idx=' + 0, roomName);
@@ -313,6 +368,7 @@ export class AppGateway
   handlePlayerInput(client: Socket, payload: UserInput): void {
     const userId = this.socketToUserId.get(client.id);
     const g: ClassicGame = this.games[this.userIdToGameIdx.get(userId)];
+    if (!g.state) return;
     if (g.state === 3) {
       const totalGoals = g.scores[0] + g.scores[1];
       if (client.id === g.players[totalGoals % 2])
