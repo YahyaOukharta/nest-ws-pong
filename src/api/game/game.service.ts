@@ -1,58 +1,62 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 
-export  class CreateGameDto {
-
+export class CreateGameDto {
   gameId: string;
 
-  mode: "classic" | "doublepaddle" | "goalkeeper";
+  mode: 'classic' | 'doublepaddle' | 'goalkeeper';
 
-  playerOne : string;
+  playerOne: string;
 
-  playerTwo : string;
+  playerTwo: string;
 
-  scoreOne : number;
+  scoreOne: number;
 
-  scoreTwo : number;
-  
-  status : 0 | 1;
+  scoreTwo: number;
+
+  status: 0 | 1;
 }
 
-export  class UpdateGameDto {
-  scoreOne? : number;
+export class UpdateGameDto {
+  scoreOne?: number;
 
-  scoreTwo? : number;
-  
-  status? : 0 | 1;
+  scoreTwo?: number;
 
-  winner? : string;
+  status?: 0 | 1;
+
+  winner?: string;
 }
 @Injectable()
 export class GameService {
-  async newGame(cookie: string, data: CreateGameDto): Promise<CreateGameDto | false> {
+  async newGame(
+    cookie: string,
+    authorization: string,
+    data: CreateGameDto,
+  ): Promise<CreateGameDto | false> {
     try {
-      const res = await axios.post('http://localhost:3500/game', 
-        data,
-        { // http://users:3500 when docker compose
-          headers: { cookie },
-        },
-      );
-      console.log("game created > ",res.data)
+      const res = await axios.post('http://users:3500/game', data, {
+        // http://users:3500 when docker compose
+        headers: { cookie, authorization },
+      });
+      console.log('game created > ', res.data);
       return res.data;
     } catch (e) {
       //console.log(e);
       return false;
     }
   }
-  async updateGame(cookie: string, gameId:string , data: UpdateGameDto): Promise<CreateGameDto | false> {
+  async updateGame(
+    cookie: string,
+    authorization: string,
+    gameId: string,
+    data: UpdateGameDto,
+  ): Promise<CreateGameDto | false> {
     try {
-      const res = await axios.post('http://localhost:3500/game/'+gameId, 
-        data,
-        { // http://users:3500 when docker compose
-          headers: { cookie },
-        },
-      );
-      console.log("game updated > ",res.data)
+      const res = await axios.post('http://users:3500/game/' + gameId, data, {
+        // http://users:3500 when docker compose
+        headers: { cookie, authorization },
+      });
+      console.log('game updated > ', res.data);
       return res.data;
     } catch (e) {
       //console.log(e);

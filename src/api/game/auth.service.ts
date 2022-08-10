@@ -19,10 +19,14 @@ export interface User {
 
 @Injectable()
 export class AuthService {
-  async isAuthenticated(cookie: string): Promise<false | User> {
+  async isAuthenticated(
+    cookie: string,
+    authorization: string,
+  ): Promise<false | User> {
     try {
-      const res = await axios.get('http://localhost:3500/auth/isLogged', { // http://users:3500 when docker compose
-        headers: { cookie },
+      const res = await axios.get('http://users:3500/user', {
+        // http://users:3500 when docker compose
+        headers: { cookie, authorization },
       });
       return res.data;
     } catch (e) {
