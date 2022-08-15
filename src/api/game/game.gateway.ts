@@ -355,7 +355,11 @@ export class AppGateway
     console.log(roomName);
 
     const ltsIdx = payload.custom?.invitation ? this.invitationToGameIdx.get(payload.custom.invitation) : this.gameModeToLatestGameIdx.get(payload.mode);
-
+    if(payload.custom?.invitation && !this.invitationToGameIdx.has(payload.custom.invitation))
+    {
+      socket.emit("invalidInvitation");
+      return;
+    }
     if (this.games.length) {
       console.log(ltsIdx);
       if (
@@ -398,7 +402,10 @@ export class AppGateway
         );
 
         this.games[this.games.length - 1].setRoomName(roomName);
-
+        if (payload.custom) {
+          this.games[this.games.length - 1].setPrivateList([userId, payload.custom.opponent]);
+          this.invitationToGameIdx.set(roomName, this.games.length - 1)
+        }
         socket.join(roomName);
         console.log('Created game idx=' + (this.games.length - 1), roomName);
 
