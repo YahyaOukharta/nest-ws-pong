@@ -18,7 +18,8 @@ interface UserInput {
   userId: string;
 }
 interface CustomGamePayload {
-  opponent: string;
+  opponent?: string;
+  invitation?: string;
 }
 interface PlayerJoinedPayload {
   mode: string; // game mode
@@ -69,7 +70,7 @@ export class AppGateway
     NodeJS.Timeout
   >();
 
-  private invitedSockToGameIdx : Map<string, number> = new Map<string, number>();
+  private invitationToGameIdx : Map<string, number> = new Map<string, number>();
 
 
   afterInit(server: Server): void {
@@ -343,14 +344,17 @@ export class AppGateway
       } else return;
     }
     //console.log(socket.user);
-    if (payload.custom) {
+    if (payload.custom?.opponent) {
       console.log('Private game');
+    }
+    if (payload.custom?.invitation) {
+      console.log('Invited To Private game ');
     }
 
     const roomName: string = socket.id;
     console.log(roomName);
 
-    const ltsIdx = payload.custom ? this.gameModeToLatestGameIdx.get(payload.mode) : 
+    const ltsIdx = payload.custom?.invitation ? this.invitationToGameIdx.get(payload.custom.invitation) : this.gameModeToLatestGameIdx.get(payload.mode);
 
     if (this.games.length) {
       console.log(ltsIdx);
@@ -409,6 +413,7 @@ export class AppGateway
       this.games[0].addPlayer(socket.id, (socket.request as any).user);
       if (payload.custom) {
         this.games[0].setPrivateList([userId, payload.custom.opponent]);
+        this.invitationToGameIdx.set(roomName, 0)
       }
       this.games[0].setRoomName(roomName);
       socket.join(roomName);

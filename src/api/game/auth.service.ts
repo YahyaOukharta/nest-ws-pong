@@ -24,8 +24,8 @@ export class AuthService {
     authorization: string,
   ): Promise<false | User> {
     try {
-      const res = await axios.get('http://users:3500/user', {
-        // http://users:3500 when docker compose
+      const res = await axios.get('http://localhost:3500/user', {
+        // http://localhost:3500 when docker compose
         headers: { cookie, authorization },
       });
       return res.data;
