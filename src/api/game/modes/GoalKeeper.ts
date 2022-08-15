@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import {Game, UserInput, GoalKeeperConfig, GameState} from "./Types"
+import { Game, UserInput, GoalKeeperConfig, GameState } from './Types';
 
 const min = (a: number, b: number) => {
   return a < b ? a : b;
@@ -11,15 +11,13 @@ const max = (a: number, b: number) => {
 export class GoalKeeper extends Game {
   constructor(server: Server) {
     super();
-    this.mode = "GoalKeeper",
-
-    this.server = server;
+    (this.mode = 'GoalKeeper'), (this.server = server);
 
     this.aspectRatio = 16 / 9;
     this.width = 1000;
     this.height = this.width / this.aspectRatio;
 
-    this.gameModeConfig = new GoalKeeperConfig()
+    this.gameModeConfig = new GoalKeeperConfig();
 
     this.initBallX = this.width / 2;
     this.initBallY = this.height / 2;
@@ -35,7 +33,10 @@ export class GoalKeeper extends Game {
     this.paddleSpeed = 5;
     this.paddleOneX = this.height * this.gameModeConfig.borderSize;
     this.paddleOneY = this.height * this.gameModeConfig.borderSize;
-    this.paddleTwoX = this.width - this.paddleWidth - this.height * this.gameModeConfig.borderSize;
+    this.paddleTwoX =
+      this.width -
+      this.paddleWidth -
+      this.height * this.gameModeConfig.borderSize;
     this.paddleTwoY = this.height * this.gameModeConfig.borderSize;
 
     this.state = 0;
@@ -47,13 +48,13 @@ export class GoalKeeper extends Game {
 
     this.done = false;
     this.timeout = 0;
-    this.timeoutPeriodInSeconds = 5; 
+    this.timeoutPeriodInSeconds = 5;
 
-    this.winner = "";
+    this.winner = '';
 
-    this.playerData = []
+    this.playerData = [];
 
-
+    this.privateList = undefined;
     //this.run();
   }
   init() {
@@ -64,7 +65,8 @@ export class GoalKeeper extends Game {
     this.ballDirX = totalGoals % 2 ? 1 : -1;
     this.ballDirY = -1;
 
-    const borderSize = this.height * (<GoalKeeperConfig>this.gameModeConfig).borderSize
+    const borderSize =
+      this.height * (<GoalKeeperConfig>this.gameModeConfig).borderSize;
 
     this.paddleOneX = borderSize;
     this.paddleOneY = borderSize;
@@ -76,17 +78,20 @@ export class GoalKeeper extends Game {
     this.emitState();
     clearInterval(this.loop);
   }
-  setDone(d: boolean){
+  setDone(d: boolean) {
     this.done = d;
   }
-  setTimeout(v: number){
+  setTimeout(v: number) {
     this.timeout = v;
   }
   getPlayers(): Array<string> {
     return this.players;
   }
+  setPrivateList(playerIds: Array<string>) {
+    this.privateList = playerIds;
+  }
   addPlayer(id: string, user: any): void {
-    if (this.players.length < 2){
+    if (this.players.length < 2) {
       this.players.push(id);
       this.playerData.push(user);
     }
@@ -103,7 +108,7 @@ export class GoalKeeper extends Game {
   }
   getGameState(): GameState {
     return {
-      mode: "GoalKeeper",
+      mode: 'GoalKeeper',
       aspectRatio: this.aspectRatio,
 
       width: this.width,
@@ -126,11 +131,11 @@ export class GoalKeeper extends Game {
       state: this.state,
       players: this.players,
       scores: this.scores,
-      maxScore : this.maxScore,
+      maxScore: this.maxScore,
       timestamp: Date.now(),
 
       done: this.done,
-      winner : this.winner,
+      winner: this.winner,
 
       timeout: this.timeout,
       timeoutPeriodInSeconds: this.timeoutPeriodInSeconds,
@@ -152,12 +157,10 @@ export class GoalKeeper extends Game {
       }
 
       this.emitState();
-      if(this.done)
-        this.cleanup()
-
+      if (this.done) this.cleanup();
     }, 1000 / fps);
   }
-  replacePlayer(oldSock: string, newSock: string){
+  replacePlayer(oldSock: string, newSock: string) {
     const idx = this.players.indexOf(oldSock);
     // console.log("old sock ", oldSock, "new sock " , newSock, idx)
     this.players[idx] = newSock;
@@ -165,12 +168,17 @@ export class GoalKeeper extends Game {
   gameOver(): boolean {
     return this.scores.includes(this.maxScore);
   }
-  intersectionBorder({rx,ry}){
-    const borderSize = this.height * (<GoalKeeperConfig>this.gameModeConfig).borderSize
+  intersectionBorder({ rx, ry }) {
+    const borderSize =
+      this.height * (<GoalKeeperConfig>this.gameModeConfig).borderSize;
     const DeltaX = this.ballX - max(rx, min(this.ballX, rx + borderSize));
-    const borderHeight = this.height * (0.5 - (<GoalKeeperConfig>this.gameModeConfig).goalSize / 2)
+    const borderHeight =
+      this.height *
+      (0.5 - (<GoalKeeperConfig>this.gameModeConfig).goalSize / 2);
     const DeltaY = this.ballY - max(ry, min(this.ballY, ry + borderHeight));
-    return (DeltaX * DeltaX + DeltaY * DeltaY) < (this.ballRadius * this.ballRadius);
+    return (
+      DeltaX * DeltaX + DeltaY * DeltaY < this.ballRadius * this.ballRadius
+    );
   }
   updateBall() {
     //update
@@ -185,124 +193,127 @@ export class GoalKeeper extends Game {
       this.ballY = min(this.ballY, this.height - this.ballRadius);
     else this.ballY = max(this.ballY, this.ballRadius);
 
-    const borderSize = this.height * (<GoalKeeperConfig>this.gameModeConfig).borderSize
-    const borderHeight = this.height * (0.5 - (<GoalKeeperConfig>this.gameModeConfig).goalSize / 2)
+    const borderSize =
+      this.height * (<GoalKeeperConfig>this.gameModeConfig).borderSize;
+    const borderHeight =
+      this.height *
+      (0.5 - (<GoalKeeperConfig>this.gameModeConfig).goalSize / 2);
 
-    let rx = 0 
-    let ry = 0
-    if(this.intersectionBorder({ // top left
-      rx,
-      ry
-    })){
-      
+    let rx = 0;
+    let ry = 0;
+    if (
+      this.intersectionBorder({
+        // top left
+        rx,
+        ry,
+      })
+    ) {
       const DeltaX = max(rx, min(this.ballX, rx + borderSize));
       const DeltaY = max(ry, min(this.ballY, ry + borderHeight));
-      if (DeltaX > rx && DeltaX < rx + borderSize){
-        if(DeltaY === ry){
-          this.ballY = min(this.ballY, ry-this.ballRadius);
+      if (DeltaX > rx && DeltaX < rx + borderSize) {
+        if (DeltaY === ry) {
+          this.ballY = min(this.ballY, ry - this.ballRadius);
           this.ballDirY *= -1;
-        }
-        else if(DeltaY === ry + borderHeight)  {
+        } else if (DeltaY === ry + borderHeight) {
           this.ballY = max(this.ballY, ry + borderHeight + this.ballRadius);
           this.ballDirY *= -1;
         }
       }
-      if (DeltaY > ry && DeltaY < ry + borderHeight){
-        if(DeltaX === rx){
-          this.ballX = min(this.ballX, rx-this.ballRadius);
+      if (DeltaY > ry && DeltaY < ry + borderHeight) {
+        if (DeltaX === rx) {
+          this.ballX = min(this.ballX, rx - this.ballRadius);
           this.ballDirX *= -1;
-        }
-        else if(DeltaX === rx+borderSize){
+        } else if (DeltaX === rx + borderSize) {
           this.ballX = max(this.ballX, rx + borderSize + this.ballRadius);
           this.ballDirX *= -1;
         }
       }
     }
-    rx = 0
-    ry = this.height - borderHeight
-    if(this.intersectionBorder({ // bot left
-      rx,
-      ry
-    })){
-      
+    rx = 0;
+    ry = this.height - borderHeight;
+    if (
+      this.intersectionBorder({
+        // bot left
+        rx,
+        ry,
+      })
+    ) {
       const DeltaX = max(rx, min(this.ballX, rx + borderSize));
       const DeltaY = max(ry, min(this.ballY, ry + borderHeight));
-      if (DeltaX > rx && DeltaX < rx + borderSize){
-        if(DeltaY === ry){
-          this.ballY = min(this.ballY, ry-this.ballRadius);
+      if (DeltaX > rx && DeltaX < rx + borderSize) {
+        if (DeltaY === ry) {
+          this.ballY = min(this.ballY, ry - this.ballRadius);
           this.ballDirY *= -1;
-        }
-        else if(DeltaY === ry + borderHeight)  {
+        } else if (DeltaY === ry + borderHeight) {
           this.ballY = max(this.ballY, ry + borderHeight + this.ballRadius);
           this.ballDirY *= -1;
         }
       }
-      if (DeltaY > ry && DeltaY < ry + borderHeight){
-        if(DeltaX === rx){
-          this.ballX = min(this.ballX, rx-this.ballRadius);
+      if (DeltaY > ry && DeltaY < ry + borderHeight) {
+        if (DeltaX === rx) {
+          this.ballX = min(this.ballX, rx - this.ballRadius);
           this.ballDirX *= -1;
-        }
-        else if(DeltaX === rx+borderSize){
+        } else if (DeltaX === rx + borderSize) {
           this.ballX = max(this.ballX, rx + borderSize + this.ballRadius);
           this.ballDirX *= -1;
         }
       }
     }
-    rx = this.width - borderSize // top right
-    ry = 0
-    if(this.intersectionBorder({ // bot left
-      rx,
-      ry
-    })){
-      
+    rx = this.width - borderSize; // top right
+    ry = 0;
+    if (
+      this.intersectionBorder({
+        // bot left
+        rx,
+        ry,
+      })
+    ) {
       const DeltaX = max(rx, min(this.ballX, rx + borderSize));
       const DeltaY = max(ry, min(this.ballY, ry + borderHeight));
-      if (DeltaX > rx && DeltaX < rx + borderSize){
-        if(DeltaY === ry){
-          this.ballY = min(this.ballY, ry-this.ballRadius);
+      if (DeltaX > rx && DeltaX < rx + borderSize) {
+        if (DeltaY === ry) {
+          this.ballY = min(this.ballY, ry - this.ballRadius);
           this.ballDirY *= -1;
-        }
-        else if(DeltaY === ry + borderHeight)  {
+        } else if (DeltaY === ry + borderHeight) {
           this.ballY = max(this.ballY, ry + borderHeight + this.ballRadius);
           this.ballDirY *= -1;
         }
       }
-      if (DeltaY > ry && DeltaY < ry + borderHeight){
-        if(DeltaX === rx){
-          this.ballX = min(this.ballX, rx-this.ballRadius);
+      if (DeltaY > ry && DeltaY < ry + borderHeight) {
+        if (DeltaX === rx) {
+          this.ballX = min(this.ballX, rx - this.ballRadius);
           this.ballDirX *= -1;
-        }
-        else if(DeltaX === rx+borderSize){
+        } else if (DeltaX === rx + borderSize) {
           this.ballX = max(this.ballX, rx + borderSize + this.ballRadius);
           this.ballDirX *= -1;
         }
       }
     }
-    rx = this.width - borderSize // top right
-    ry = this.height - borderHeight
-    if(this.intersectionBorder({ // bot left
-      rx,
-      ry
-    })){
-      
+    rx = this.width - borderSize; // top right
+    ry = this.height - borderHeight;
+    if (
+      this.intersectionBorder({
+        // bot left
+        rx,
+        ry,
+      })
+    ) {
       const DeltaX = max(rx, min(this.ballX, rx + borderSize));
       const DeltaY = max(ry, min(this.ballY, ry + borderHeight));
-      if (DeltaX > rx && DeltaX < rx + borderSize){
-        if(DeltaY === ry){
-          this.ballY = min(this.ballY, ry-this.ballRadius);
+      if (DeltaX > rx && DeltaX < rx + borderSize) {
+        if (DeltaY === ry) {
+          this.ballY = min(this.ballY, ry - this.ballRadius);
           this.ballDirY *= -1;
-        }
-        else if(DeltaY === ry + borderHeight)  {
+        } else if (DeltaY === ry + borderHeight) {
           this.ballY = max(this.ballY, ry + borderHeight + this.ballRadius);
           this.ballDirY *= -1;
         }
       }
-      if (DeltaY > ry && DeltaY < ry + borderHeight){
-        if(DeltaX === rx){
-          this.ballX = min(this.ballX, rx-this.ballRadius);
+      if (DeltaY > ry && DeltaY < ry + borderHeight) {
+        if (DeltaX === rx) {
+          this.ballX = min(this.ballX, rx - this.ballRadius);
           this.ballDirX *= -1;
-        }
-        else if(DeltaX === rx+borderSize){
+        } else if (DeltaX === rx + borderSize) {
           this.ballX = max(this.ballX, rx + borderSize + this.ballRadius);
           this.ballDirX *= -1;
         }
@@ -331,92 +342,104 @@ export class GoalKeeper extends Game {
       this.ballDirY *= -1;
   }
   updatePaddleOne(dir: string) {
-    const borderSize = this.height * (<GoalKeeperConfig>this.gameModeConfig).borderSize
+    const borderSize =
+      this.height * (<GoalKeeperConfig>this.gameModeConfig).borderSize;
     if (dir === 'DOWN') {
       this.paddleOneY += this.paddleSpeed;
-      this.paddleOneY = min(this.paddleOneY, this.height - this.paddleHeight - borderSize);
+      this.paddleOneY = min(
+        this.paddleOneY,
+        this.height - this.paddleHeight - borderSize,
+      );
     } else {
       this.paddleOneY -= this.paddleSpeed;
       this.paddleOneY = max(this.paddleOneY, borderSize);
     }
   }
   updatePaddleTwo(dir: string) {
-    const borderSize = this.height * (<GoalKeeperConfig>this.gameModeConfig).borderSize
+    const borderSize =
+      this.height * (<GoalKeeperConfig>this.gameModeConfig).borderSize;
 
     if (dir === 'DOWN') {
       this.paddleTwoY += this.paddleSpeed;
-      this.paddleTwoY = min(this.paddleTwoY, this.height - this.paddleHeight - borderSize);
+      this.paddleTwoY = min(
+        this.paddleTwoY,
+        this.height - this.paddleHeight - borderSize,
+      );
     } else {
       this.paddleTwoY -= this.paddleSpeed;
       this.paddleTwoY = max(this.paddleTwoY, borderSize);
     }
   }
-  intersectionPaddle({rx,ry}){
+  intersectionPaddle({ rx, ry }) {
     const DeltaX = this.ballX - max(rx, min(this.ballX, rx + this.paddleWidth));
-    const DeltaY = this.ballY - max(ry, min(this.ballY, ry + this.paddleHeight));
-    return (DeltaX * DeltaX + DeltaY * DeltaY) < (this.ballRadius * this.ballRadius);
+    const DeltaY =
+      this.ballY - max(ry, min(this.ballY, ry + this.paddleHeight));
+    return (
+      DeltaX * DeltaX + DeltaY * DeltaY < this.ballRadius * this.ballRadius
+    );
   }
   handlePaddleOneBounce() {
-    let rx = this.paddleOneX
-    let ry = this.paddleOneY
-    if(this.intersectionPaddle({
-      rx,
-      ry
-    })){
-      
+    const rx = this.paddleOneX;
+    const ry = this.paddleOneY;
+    if (
+      this.intersectionPaddle({
+        rx,
+        ry,
+      })
+    ) {
       const DeltaX = max(rx, min(this.ballX, rx + this.paddleWidth));
       const DeltaY = max(ry, min(this.ballY, ry + this.paddleHeight));
-      if (DeltaX > rx && DeltaX < rx + this.paddleWidth){
-        if(DeltaY === ry){
-          this.ballY = min(this.ballY, ry-this.ballRadius);
+      if (DeltaX > rx && DeltaX < rx + this.paddleWidth) {
+        if (DeltaY === ry) {
+          this.ballY = min(this.ballY, ry - this.ballRadius);
           this.ballDirY *= -1;
-        }
-        else if(DeltaY === ry + this.paddleHeight)  {
-          this.ballY = max(this.ballY, ry + this.paddleHeight + this.ballRadius);
+        } else if (DeltaY === ry + this.paddleHeight) {
+          this.ballY = max(
+            this.ballY,
+            ry + this.paddleHeight + this.ballRadius,
+          );
           this.ballDirY *= -1;
         }
       }
-      if (DeltaY > ry && DeltaY < ry + this.paddleHeight){
-        if(DeltaX === rx){
-          this.ballX = min(this.ballX, rx-this.ballRadius);
+      if (DeltaY > ry && DeltaY < ry + this.paddleHeight) {
+        if (DeltaX === rx) {
+          this.ballX = min(this.ballX, rx - this.ballRadius);
           this.ballDirX *= -1;
-        }
-        else if(DeltaX === rx+this.paddleWidth){
+        } else if (DeltaX === rx + this.paddleWidth) {
           this.ballX = max(this.ballX, rx + this.paddleWidth + this.ballRadius);
           this.ballDirX *= -1;
         }
       }
-      
     }
-
   }
   handlePaddleTwoBounce() {
-    let rx = this.paddleTwoX
-    let ry = this.paddleTwoY
-    if(this.intersectionPaddle({
-      rx,
-      ry
-    })){
-      
+    const rx = this.paddleTwoX;
+    const ry = this.paddleTwoY;
+    if (
+      this.intersectionPaddle({
+        rx,
+        ry,
+      })
+    ) {
       const DeltaX = max(rx, min(this.ballX, rx + this.paddleWidth));
       const DeltaY = max(ry, min(this.ballY, ry + this.paddleHeight));
-      if (DeltaY > ry && DeltaY < ry + this.paddleHeight){
-        if(DeltaX === rx){
-          this.ballX = min(this.ballX, rx-this.ballRadius);
+      if (DeltaY > ry && DeltaY < ry + this.paddleHeight) {
+        if (DeltaX === rx) {
+          this.ballX = min(this.ballX, rx - this.ballRadius);
           this.ballDirX *= -1;
-        }
-        else{
+        } else {
           this.ballX = max(this.ballX, rx + this.paddleWidth + this.ballRadius);
           this.ballDirX *= -1;
         }
-      }
-      else if (DeltaX > rx && DeltaX < rx + this.paddleWidth){
-        if(DeltaY === ry){
-          this.ballY = min(this.ballY, ry-this.ballRadius);
+      } else if (DeltaX > rx && DeltaX < rx + this.paddleWidth) {
+        if (DeltaY === ry) {
+          this.ballY = min(this.ballY, ry - this.ballRadius);
           this.ballDirY *= -1;
-        }
-        else{
-          this.ballY = max(this.ballY, ry + this.paddleHeight + this.ballRadius);
+        } else {
+          this.ballY = max(
+            this.ballY,
+            ry + this.paddleHeight + this.ballRadius,
+          );
           this.ballDirY *= -1;
         }
       }

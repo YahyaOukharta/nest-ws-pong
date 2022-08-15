@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import {Game, UserInput, GameState} from "./Types"
+import { Game, UserInput, GameState } from './Types';
 
 const min = (a: number, b: number) => {
   return a < b ? a : b;
@@ -11,9 +11,7 @@ const max = (a: number, b: number) => {
 export class ClassicGame extends Game {
   constructor(server: Server) {
     super();
-    this.mode = "Classic",
-
-    this.server = server;
+    (this.mode = 'Classic'), (this.server = server);
 
     this.aspectRatio = 16 / 9;
     this.width = 1000;
@@ -45,13 +43,15 @@ export class ClassicGame extends Game {
 
     this.done = false;
     this.timeout = 0;
-    this.timeoutPeriodInSeconds = 5; 
+    this.timeoutPeriodInSeconds = 5;
 
-    this.winner = "";
+    this.winner = '';
 
     this.gameModeConfig = null;
 
-    this.playerData = []
+    this.playerData = [];
+
+    this.privateList = undefined;
 
     //this.run();
   }
@@ -73,17 +73,20 @@ export class ClassicGame extends Game {
     this.emitState();
     clearInterval(this.loop);
   }
-  setDone(d: boolean){
+  setDone(d: boolean) {
     this.done = d;
   }
-  setTimeout(v: number){
+  setTimeout(v: number) {
     this.timeout = v;
   }
   getPlayers(): Array<string> {
     return this.players;
   }
+  setPrivateList(playerIds: Array<string>) {
+    this.privateList = playerIds;
+  }
   addPlayer(id: string, user: any): void {
-    if (this.players.length < 2){
+    if (this.players.length < 2) {
       this.players.push(id);
       this.playerData.push(user);
     }
@@ -100,7 +103,7 @@ export class ClassicGame extends Game {
   }
   getGameState(): GameState {
     return {
-      mode: "Classic",
+      mode: 'Classic',
       aspectRatio: this.aspectRatio,
 
       width: this.width,
@@ -123,11 +126,11 @@ export class ClassicGame extends Game {
       state: this.state,
       players: this.players,
       scores: this.scores,
-      maxScore : this.maxScore,
+      maxScore: this.maxScore,
       timestamp: Date.now(),
 
       done: this.done,
-      winner : this.winner,
+      winner: this.winner,
 
       timeout: this.timeout,
       timeoutPeriodInSeconds: this.timeoutPeriodInSeconds,
@@ -150,12 +153,10 @@ export class ClassicGame extends Game {
       }
 
       this.emitState();
-      if(this.done)
-        this.cleanup()
-
+      if (this.done) this.cleanup();
     }, 1000 / fps);
   }
-  replacePlayer(oldSock: string, newSock: string){
+  replacePlayer(oldSock: string, newSock: string) {
     const idx = this.players.indexOf(oldSock);
     // console.log("old sock ", oldSock, "new sock " , newSock, idx)
     this.players[idx] = newSock;
@@ -235,8 +236,7 @@ export class ClassicGame extends Game {
       this.ballY < this.paddleOneY + this.paddleHeight / 2
     ) {
       this.ballY = min(this.ballY, this.paddleOneY - this.ballRadius);
-      if (this.ballY + this.ballRadius >= this.paddleOneY)
-        this.ballDirY *= -1;
+      if (this.ballY + this.ballRadius >= this.paddleOneY) this.ballDirY *= -1;
     } else if (
       //vertical intersection, ball going up
       this.ballDirX === -1 &&
@@ -249,10 +249,7 @@ export class ClassicGame extends Game {
         this.ballY,
         this.paddleOneY + this.paddleHeight + this.ballRadius,
       );
-      if (
-        this.ballY - this.ballRadius <=
-        this.paddleOneY + this.paddleHeight
-      )
+      if (this.ballY - this.ballRadius <= this.paddleOneY + this.paddleHeight)
         this.ballDirY *= -1;
     }
   }
@@ -278,8 +275,7 @@ export class ClassicGame extends Game {
       this.ballY < this.paddleTwoY + this.paddleHeight / 2
     ) {
       this.ballY = min(this.ballY, this.paddleTwoY - this.ballRadius);
-      if (this.ballY + this.ballRadius >= this.paddleTwoY)
-        this.ballDirY *= -1;
+      if (this.ballY + this.ballRadius >= this.paddleTwoY) this.ballDirY *= -1;
     } else if (
       //vertical intersection, ball going up
       this.ballDirX === 1 &&
@@ -292,10 +288,7 @@ export class ClassicGame extends Game {
         this.ballY,
         this.paddleTwoY + this.paddleHeight + this.ballRadius,
       );
-      if (
-        this.ballY - this.ballRadius <=
-        this.paddleTwoY + this.paddleHeight
-      )
+      if (this.ballY - this.ballRadius <= this.paddleTwoY + this.paddleHeight)
         this.ballDirY *= -1;
     }
   }

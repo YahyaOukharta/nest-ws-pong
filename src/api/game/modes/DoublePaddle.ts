@@ -1,5 +1,5 @@
 import { Server } from 'socket.io';
-import {Game, UserInput, DoublePaddleConfig, GameState} from "./Types"
+import { Game, UserInput, DoublePaddleConfig, GameState } from './Types';
 const min = (a: number, b: number) => {
   return a < b ? a : b;
 };
@@ -9,9 +9,7 @@ const max = (a: number, b: number) => {
 export class DoublePaddle extends Game {
   constructor(server: Server) {
     super();
-    this.mode = "DoublePaddle",
-
-    this.server = server;
+    (this.mode = 'DoublePaddle'), (this.server = server);
 
     this.aspectRatio = 16 / 9;
     this.width = 1000;
@@ -43,14 +41,15 @@ export class DoublePaddle extends Game {
 
     this.done = false;
     this.timeout = 0;
-    this.timeoutPeriodInSeconds = 5; 
+    this.timeoutPeriodInSeconds = 5;
 
-    this.winner = "";
+    this.winner = '';
 
-    this.gameModeConfig = new DoublePaddleConfig()
+    this.gameModeConfig = new DoublePaddleConfig();
 
-    this.playerData = []
+    this.playerData = [];
     //this.run();
+    this.privateList = undefined;
   }
   init() {
     this.ballX = this.initBallX;
@@ -66,23 +65,26 @@ export class DoublePaddle extends Game {
     this.paddleTwoX = this.width - this.paddleWidth;
     this.paddleTwoY = 0;
 
-    this.playerData = []
+    this.playerData = [];
   }
   cleanup(): void {
     this.emitState();
     clearInterval(this.loop);
   }
-  setDone(d: boolean){
+  setDone(d: boolean) {
     this.done = d;
   }
-  setTimeout(v: number){
+  setTimeout(v: number) {
     this.timeout = v;
   }
   getPlayers(): Array<string> {
     return this.players;
   }
+  setPrivateList(playerIds: Array<string>) {
+    this.privateList = playerIds;
+  }
   addPlayer(id: string, user: any): void {
-    if (this.players.length < 2){
+    if (this.players.length < 2) {
       this.players.push(id);
       this.playerData.push(user);
     }
@@ -99,7 +101,7 @@ export class DoublePaddle extends Game {
   }
   getGameState(): GameState {
     return {
-      mode: "DoublePaddle",
+      mode: 'DoublePaddle',
       aspectRatio: this.aspectRatio,
 
       width: this.width,
@@ -122,18 +124,19 @@ export class DoublePaddle extends Game {
       state: this.state,
       players: this.players,
       scores: this.scores,
-      maxScore : this.maxScore,
+      maxScore: this.maxScore,
       timestamp: Date.now(),
 
       done: this.done,
-      winner : this.winner,
+      winner: this.winner,
 
       timeout: this.timeout,
       timeoutPeriodInSeconds: this.timeoutPeriodInSeconds,
 
       gameModeConfig: this.gameModeConfig,
 
-      playerData: JSON.stringify(this.playerData),    };
+      playerData: JSON.stringify(this.playerData),
+    };
   }
   async emitState() {
     this.server.to(this.room).emit('gameState', this.getGameState());
@@ -148,12 +151,10 @@ export class DoublePaddle extends Game {
       }
 
       this.emitState();
-      if(this.done)
-        this.cleanup()
-
+      if (this.done) this.cleanup();
     }, 1000 / fps);
   }
-  replacePlayer(oldSock: string, newSock: string){
+  replacePlayer(oldSock: string, newSock: string) {
     const idx = this.players.indexOf(oldSock);
     // console.log("old sock ", oldSock, "new sock " , newSock, idx)
     this.players[idx] = newSock;
@@ -196,10 +197,16 @@ export class DoublePaddle extends Game {
     )
       this.ballDirY *= -1;
   }
-  updatePaddleOne(dir: string) { // double paddle 
+  updatePaddleOne(dir: string) {
+    // double paddle
     if (dir === 'DOWN') {
       this.paddleOneY += this.paddleSpeed;
-      this.paddleOneY = min(this.paddleOneY, this.height - this.paddleHeight - this.height * (<DoublePaddleConfig>this.gameModeConfig).paddleYOffset);
+      this.paddleOneY = min(
+        this.paddleOneY,
+        this.height -
+          this.paddleHeight -
+          this.height * (<DoublePaddleConfig>this.gameModeConfig).paddleYOffset,
+      );
     } else {
       this.paddleOneY -= this.paddleSpeed;
       this.paddleOneY = max(this.paddleOneY, 0);
@@ -208,76 +215,90 @@ export class DoublePaddle extends Game {
   updatePaddleTwo(dir: string) {
     if (dir === 'DOWN') {
       this.paddleTwoY += this.paddleSpeed;
-      this.paddleTwoY = min(this.paddleTwoY, this.height - this.paddleHeight  - this.height * (<DoublePaddleConfig>this.gameModeConfig).paddleYOffset);
+      this.paddleTwoY = min(
+        this.paddleTwoY,
+        this.height -
+          this.paddleHeight -
+          this.height * (<DoublePaddleConfig>this.gameModeConfig).paddleYOffset,
+      );
     } else {
       this.paddleTwoY -= this.paddleSpeed;
       this.paddleTwoY = max(this.paddleTwoY, 0);
     }
   }
-  intersection({rx,ry}){
+  intersection({ rx, ry }) {
     const DeltaX = this.ballX - max(rx, min(this.ballX, rx + this.paddleWidth));
-    const DeltaY = this.ballY - max(ry, min(this.ballY, ry + this.paddleHeight));
-    return (DeltaX * DeltaX + DeltaY * DeltaY) < (this.ballRadius * this.ballRadius);
+    const DeltaY =
+      this.ballY - max(ry, min(this.ballY, ry + this.paddleHeight));
+    return (
+      DeltaX * DeltaX + DeltaY * DeltaY < this.ballRadius * this.ballRadius
+    );
   }
   handlePaddleOneBounce() {
-
-    let rx = this.paddleOneX
-    let ry = this.paddleOneY
-    if(this.intersection({
-      rx,
-      ry
-    })){
-      
+    let rx = this.paddleOneX;
+    let ry = this.paddleOneY;
+    if (
+      this.intersection({
+        rx,
+        ry,
+      })
+    ) {
       const DeltaX = max(rx, min(this.ballX, rx + this.paddleWidth));
       const DeltaY = max(ry, min(this.ballY, ry + this.paddleHeight));
-      if (DeltaX > rx && DeltaX < rx + this.paddleWidth){
-        if(DeltaY === ry){
-          this.ballY = min(this.ballY, ry-this.ballRadius);
+      if (DeltaX > rx && DeltaX < rx + this.paddleWidth) {
+        if (DeltaY === ry) {
+          this.ballY = min(this.ballY, ry - this.ballRadius);
           this.ballDirY *= -1;
-        }
-        else if(DeltaY === ry + this.paddleHeight)  {
-          this.ballY = max(this.ballY, ry + this.paddleHeight + this.ballRadius);
+        } else if (DeltaY === ry + this.paddleHeight) {
+          this.ballY = max(
+            this.ballY,
+            ry + this.paddleHeight + this.ballRadius,
+          );
           this.ballDirY *= -1;
         }
       }
-      if (DeltaY > ry && DeltaY < ry + this.paddleHeight){
-        if(DeltaX === rx){
-          this.ballX = min(this.ballX, rx-this.ballRadius);
+      if (DeltaY > ry && DeltaY < ry + this.paddleHeight) {
+        if (DeltaX === rx) {
+          this.ballX = min(this.ballX, rx - this.ballRadius);
           this.ballDirX *= -1;
-        }
-        else if(DeltaX === rx+this.paddleWidth){
+        } else if (DeltaX === rx + this.paddleWidth) {
           this.ballX = max(this.ballX, rx + this.paddleWidth + this.ballRadius);
           this.ballDirX *= -1;
         }
       }
-      
     }
     //
-    rx = this.paddleOneX + this.width * (<DoublePaddleConfig>this.gameModeConfig).paddleXOffset
-    ry = this.paddleOneY + this.height * (<DoublePaddleConfig>this.gameModeConfig).paddleYOffset
-    if(this.intersection({
-      rx,
-      ry
-    })){
-      
+    rx =
+      this.paddleOneX +
+      this.width * (<DoublePaddleConfig>this.gameModeConfig).paddleXOffset;
+    ry =
+      this.paddleOneY +
+      this.height * (<DoublePaddleConfig>this.gameModeConfig).paddleYOffset;
+    if (
+      this.intersection({
+        rx,
+        ry,
+      })
+    ) {
       const DeltaX = max(rx, min(this.ballX, rx + this.paddleWidth));
       const DeltaY = max(ry, min(this.ballY, ry + this.paddleHeight));
-      if (DeltaX > rx && DeltaX < rx + this.paddleWidth){
-        if(DeltaY === ry){
-          this.ballY = min(this.ballY, ry-this.ballRadius);
+      if (DeltaX > rx && DeltaX < rx + this.paddleWidth) {
+        if (DeltaY === ry) {
+          this.ballY = min(this.ballY, ry - this.ballRadius);
           this.ballDirY *= -1;
-        }
-        else if(DeltaY === ry + this.paddleHeight)  {
-          this.ballY = max(this.ballY, ry + this.paddleHeight + this.ballRadius);
+        } else if (DeltaY === ry + this.paddleHeight) {
+          this.ballY = max(
+            this.ballY,
+            ry + this.paddleHeight + this.ballRadius,
+          );
           this.ballDirY *= -1;
         }
       }
-      if (DeltaY > ry && DeltaY < ry + this.paddleHeight){
-        if(DeltaX === rx){
-          this.ballX = min(this.ballX, rx-this.ballRadius);
+      if (DeltaY > ry && DeltaY < ry + this.paddleHeight) {
+        if (DeltaX === rx) {
+          this.ballX = min(this.ballX, rx - this.ballRadius);
           this.ballDirX *= -1;
-        }
-        else if(DeltaX === rx+this.paddleWidth){
+        } else if (DeltaX === rx + this.paddleWidth) {
           this.ballX = max(this.ballX, rx + this.paddleWidth + this.ballRadius);
           this.ballDirX *= -1;
         }
@@ -285,63 +306,69 @@ export class DoublePaddle extends Game {
     }
   }
   handlePaddleTwoBounce() {
-    let rx = this.paddleTwoX
-    let ry = this.paddleTwoY + this.height * (<DoublePaddleConfig>this.gameModeConfig).paddleYOffset
-    if(this.intersection({
-      rx,
-      ry
-    })){
-      
+    let rx = this.paddleTwoX;
+    let ry =
+      this.paddleTwoY +
+      this.height * (<DoublePaddleConfig>this.gameModeConfig).paddleYOffset;
+    if (
+      this.intersection({
+        rx,
+        ry,
+      })
+    ) {
       const DeltaX = max(rx, min(this.ballX, rx + this.paddleWidth));
       const DeltaY = max(ry, min(this.ballY, ry + this.paddleHeight));
-      if (DeltaY > ry && DeltaY < ry + this.paddleHeight){
-        if(DeltaX === rx){
-          this.ballX = min(this.ballX, rx-this.ballRadius);
+      if (DeltaY > ry && DeltaY < ry + this.paddleHeight) {
+        if (DeltaX === rx) {
+          this.ballX = min(this.ballX, rx - this.ballRadius);
           this.ballDirX *= -1;
-        }
-        else{
+        } else {
           this.ballX = max(this.ballX, rx + this.paddleWidth + this.ballRadius);
           this.ballDirX *= -1;
         }
-      }
-      else if (DeltaX > rx && DeltaX < rx + this.paddleWidth){
-        if(DeltaY === ry){
-          this.ballY = min(this.ballY, ry-this.ballRadius);
+      } else if (DeltaX > rx && DeltaX < rx + this.paddleWidth) {
+        if (DeltaY === ry) {
+          this.ballY = min(this.ballY, ry - this.ballRadius);
           this.ballDirY *= -1;
-        }
-        else{
-          this.ballY = max(this.ballY, ry + this.paddleHeight + this.ballRadius);
+        } else {
+          this.ballY = max(
+            this.ballY,
+            ry + this.paddleHeight + this.ballRadius,
+          );
           this.ballDirY *= -1;
         }
       }
     }
 
-    rx = this.paddleTwoX  - this.width * (<DoublePaddleConfig>this.gameModeConfig).paddleXOffset
-    ry = this.paddleTwoY
-    if(this.intersection({
-      rx,
-      ry
-    })){
-      
+    rx =
+      this.paddleTwoX -
+      this.width * (<DoublePaddleConfig>this.gameModeConfig).paddleXOffset;
+    ry = this.paddleTwoY;
+    if (
+      this.intersection({
+        rx,
+        ry,
+      })
+    ) {
       const DeltaX = max(rx, min(this.ballX, rx + this.paddleWidth));
       const DeltaY = max(ry, min(this.ballY, ry + this.paddleHeight));
-      if (DeltaY > ry && DeltaY < ry + this.paddleHeight){
-        if(DeltaX === rx){
-          this.ballX = min(this.ballX, rx-this.ballRadius);
+      if (DeltaY > ry && DeltaY < ry + this.paddleHeight) {
+        if (DeltaX === rx) {
+          this.ballX = min(this.ballX, rx - this.ballRadius);
           this.ballDirX *= -1;
-        }
-        else{
+        } else {
           this.ballX = max(this.ballX, rx + this.paddleWidth + this.ballRadius);
           this.ballDirX *= -1;
         }
-      }
-      else if (DeltaX > rx && DeltaX < rx + this.paddleWidth){
-        if(DeltaY === ry){
-          this.ballY = min(this.ballY, ry-this.ballRadius);
+      } else if (DeltaX > rx && DeltaX < rx + this.paddleWidth) {
+        if (DeltaY === ry) {
+          this.ballY = min(this.ballY, ry - this.ballRadius);
           this.ballDirY *= -1;
-        }
-        else{
-          this.ballY = max(this.ballY, ry + this.paddleHeight + this.ballRadius);
+        } else {
+          this.ballY = max(
+            this.ballY,
+            ry + this.paddleHeight + this.ballRadius,
+          );
           this.ballDirY *= -1;
         }
       }

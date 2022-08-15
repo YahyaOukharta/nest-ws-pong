@@ -5,22 +5,24 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
-import { Inject, Logger, UseGuards } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { Socket, Server } from 'socket.io';
-import { AuthGuard } from './app.guard';
 import { AuthService, User } from './auth.service';
 
 import { ClassicGame, DoublePaddle, GoalKeeper } from './modes';
 
-import { assert } from 'console';
 import { GameService } from './game.service';
 
 interface UserInput {
   input: string;
   userId: string;
 }
+interface CustomGamePayload {
+  opponent: string;
+}
 interface PlayerJoinedPayload {
   mode: string; // game mode
+  custom?: undefined | CustomGamePayload;
 }
 interface AuthenticatedSocket extends Socket {
   user: User;
@@ -66,6 +68,9 @@ export class AppGateway
     string,
     NodeJS.Timeout
   >();
+
+  private invitedSockToGameIdx : Map<string, number> = new Map<string, number>();
+
 
   afterInit(server: Server): void {
     this.server = server;
@@ -202,7 +207,7 @@ export class AppGateway
               return;
             }
 
-            let p = this.games[this.userIdToGameIdx.get(userId)].players;
+            const p = this.games[this.userIdToGameIdx.get(userId)].players;
             if (!this.games[this.userIdToGameIdx.get(userId)].winner)
               this.games[this.userIdToGameIdx.get(userId)].winner =
                 p[(p.indexOf(client.id) + 1) % 2];
@@ -303,8 +308,8 @@ export class AppGateway
         this.games[this.userIdToGameIdx.get(userId)].mode.toLowerCase() !=
         payload.mode.toLowerCase()
       ) {
-        let g = this.games[this.userIdToGameIdx.get(userId)];
-        let p = g.players;
+        const g = this.games[this.userIdToGameIdx.get(userId)];
+        const p = g.players;
         if (!this.games[this.userIdToGameIdx.get(userId)].winner)
           this.games[this.userIdToGameIdx.get(userId)].winner =
             p[(p.indexOf(socket.id) + 1) % 2];
@@ -338,23 +343,29 @@ export class AppGateway
       } else return;
     }
     //console.log(socket.user);
+    if (payload.custom) {
+      console.log('Private game');
+    }
 
     const roomName: string = socket.id;
     console.log(roomName);
 
-    const ltsIdx = this.gameModeToLatestGameIdx.get(payload.mode);
+    const ltsIdx = payload.custom ? this.gameModeToLatestGameIdx.get(payload.mode) : 
 
     if (this.games.length) {
       console.log(ltsIdx);
       if (
         ltsIdx != undefined &&
         this.games[ltsIdx] != undefined &&
-        this.games[ltsIdx].getPlayers().length < 2
+        this.games[ltsIdx].getPlayers().length < 2 &&
+        (this.games[ltsIdx].privateList === undefined ||
+          this.games[ltsIdx].privateList.includes(userId))
       ) {
         this.games[ltsIdx].addPlayer(socket.id, (socket.request as any).user);
         socket.join(this.games[ltsIdx].room);
         console.log('Joined game idx=' + ltsIdx, roomName); // not this room
         this.userIdToGameIdx.set(userId, ltsIdx);
+
         this.gameModeToLatestGameIdx.delete(payload.mode);
         const g = this.games[ltsIdx];
 
@@ -381,7 +392,9 @@ export class AppGateway
           socket.id,
           (socket.request as any).user,
         );
+
         this.games[this.games.length - 1].setRoomName(roomName);
+
         socket.join(roomName);
         console.log('Created game idx=' + (this.games.length - 1), roomName);
 
@@ -394,6 +407,9 @@ export class AppGateway
 
       this.games.push(g);
       this.games[0].addPlayer(socket.id, (socket.request as any).user);
+      if (payload.custom) {
+        this.games[0].setPrivateList([userId, payload.custom.opponent]);
+      }
       this.games[0].setRoomName(roomName);
       socket.join(roomName);
       console.log('created game idx=' + 0, roomName);
