@@ -70,8 +70,10 @@ export class AppGateway
     NodeJS.Timeout
   >();
 
-  private invitationToGameIdx : Map<string, number> = new Map<string, number>();
+  private invitationToGameIdx: Map<string, number> = new Map<string, number>();
+  private invitationToUserId: Map<string, string> = new Map<string, string>();
 
+  private subSockToUserId: Map<string, string> = new Map<string, string>();
 
   afterInit(server: Server): void {
     this.server = server;
@@ -84,8 +86,47 @@ export class AppGateway
     }
     return undefined;
   }
+  private getAllByValue(map, searchValue) {
+    const arr = [];
+    for (const [key, value] of map.entries()) {
+      if (value === searchValue) arr.push(key);
+    }
+    return arr;
+  }
 
   async handleConnection(client: Socket): Promise<void> {
+    console.log('new client', client.id, (client.request as any).user);
+  }
+
+  @SubscribeMessage('subscribeGameInvites')
+  async onSubscribeGameInvites(client: AuthenticatedSocket): Promise<void> {
+    console.log('Subscribed to GAME INVITES', client.id);
+    this.getAllByValue(
+      this.subSockToUserId,
+      (client.request as any).user.uid,
+    ).map((e) => {
+      this.subSockToUserId.delete(e);
+    });
+    this.subSockToUserId.set(client.id, (client.request as any).user.uid);
+    this.emitGameInviteUpdate(client.id);
+  }
+
+  async emitGameInviteUpdate(socketId: string): Promise<void> {
+    if (!this.subSockToUserId.has(socketId)) return;
+    console.log('EMITING');
+
+    this.server.to(socketId).emit('gameInvitesUpdate', {
+      data: this.getAllByValue(
+        this.invitationToUserId,
+        this.subSockToUserId.get(socketId),
+      ).map((i) => {
+        return { userId: this.socketToUserId.get(i), invitation: i };
+      }),
+    });
+  }
+
+  @SubscribeMessage('initGame')
+  async onInitGame(client: AuthenticatedSocket): Promise<void> {
     const user = (client.request as any).user;
     //console.log(user)
     this.logger.log('Client Connected :' + user.login + ' ' + client.id);
@@ -147,7 +188,6 @@ export class AppGateway
     this.socketToUserId.set(client.id, user.uid);
     client.emit('authenticated');
   }
-
   async handleDisconnect(client: Socket): Promise<void> {
     this.logger.log('Client Disconnected :' + client.id);
 
@@ -157,6 +197,17 @@ export class AppGateway
       if (
         this.games[this.userIdToGameIdx.get(userId)].getPlayers().length < 2
       ) {
+        if (this.games[this.userIdToGameIdx.get(userId)].privateList.length) {
+          this.invitationToUserId.delete(
+            this.games[this.userIdToGameIdx.get(userId)].players[0],
+          );
+        }
+        this.emitGameInviteUpdate(
+          this.getByValue(
+            this.subSockToUserId,
+            this.games[this.userIdToGameIdx.get(userId)].privateList[1],
+          ),
+        );
         this.games[this.userIdToGameIdx.get(userId)].players = ['-1', '-1']; //.push('-1');
         this.games[this.userIdToGameIdx.get(userId)].setState(4);
         this.userIdToGameIdx.delete(userId);
@@ -354,10 +405,14 @@ export class AppGateway
     const roomName: string = socket.id;
     console.log(roomName);
 
-    const ltsIdx = payload.custom?.invitation ? this.invitationToGameIdx.get(payload.custom.invitation) : this.gameModeToLatestGameIdx.get(payload.mode);
-    if(payload.custom?.invitation && !this.invitationToGameIdx.has(payload.custom.invitation))
-    {
-      socket.emit("invalidInvitation");
+    const ltsIdx = payload.custom?.invitation
+      ? this.invitationToGameIdx.get(payload.custom.invitation)
+      : this.gameModeToLatestGameIdx.get(payload.mode);
+    if (
+      payload.custom?.invitation &&
+      !this.invitationToGameIdx.has(payload.custom.invitation)
+    ) {
+      socket.emit('invalidInvitation');
       return;
     }
     if (this.games.length) {
@@ -365,10 +420,23 @@ export class AppGateway
       if (
         ltsIdx != undefined &&
         this.games[ltsIdx] != undefined &&
-        this.games[ltsIdx].getPlayers().length < 2 &&
-        (this.games[ltsIdx].privateList === undefined ||
-          this.games[ltsIdx].privateList.includes(userId))
+        this.games[ltsIdx].getPlayers().length < 2
       ) {
+        if (
+          !(
+            this.games[ltsIdx].privateList === undefined ||
+            this.games[ltsIdx].privateList.includes(userId)
+          )
+        ) {
+          socket.emit('invalidInvitation');
+          return;
+        } else if (payload.custom?.invitation) {
+          this.emitGameInviteUpdate(
+            this.invitationToUserId.get(payload.custom?.invitation),
+          );
+          this.invitationToGameIdx.delete(payload.custom?.invitation);
+          this.invitationToUserId.delete(payload.custom?.invitation);
+        }
         this.games[ltsIdx].addPlayer(socket.id, (socket.request as any).user);
         socket.join(this.games[ltsIdx].room);
         console.log('Joined game idx=' + ltsIdx, roomName); // not this room
@@ -403,8 +471,16 @@ export class AppGateway
 
         this.games[this.games.length - 1].setRoomName(roomName);
         if (payload.custom) {
-          this.games[this.games.length - 1].setPrivateList([userId, payload.custom.opponent]);
-          this.invitationToGameIdx.set(roomName, this.games.length - 1)
+          this.games[this.games.length - 1].setPrivateList([
+            userId,
+            payload.custom.opponent,
+          ]);
+          this.invitationToGameIdx.set(roomName, this.games.length - 1);
+          this.invitationToUserId.set(roomName, payload.custom.opponent);
+
+          this.emitGameInviteUpdate(
+            this.getByValue(this.subSockToUserId, payload.custom.opponent),
+          );
         }
         socket.join(roomName);
         console.log('Created game idx=' + (this.games.length - 1), roomName);
@@ -420,7 +496,12 @@ export class AppGateway
       this.games[0].addPlayer(socket.id, (socket.request as any).user);
       if (payload.custom) {
         this.games[0].setPrivateList([userId, payload.custom.opponent]);
-        this.invitationToGameIdx.set(roomName, 0)
+        this.invitationToGameIdx.set(roomName, 0);
+        this.invitationToUserId.set(roomName, payload.custom.opponent);
+
+        this.emitGameInviteUpdate(
+          this.getByValue(this.subSockToUserId, payload.custom.opponent),
+        );
       }
       this.games[0].setRoomName(roomName);
       socket.join(roomName);
