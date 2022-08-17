@@ -197,17 +197,18 @@ export class AppGateway
       if (
         this.games[this.userIdToGameIdx.get(userId)].getPlayers().length < 2
       ) {
-        if (this.games[this.userIdToGameIdx.get(userId)].privateList.length) {
+        if (this.games[this.userIdToGameIdx.get(userId)].privateList?.length) {
           this.invitationToUserId.delete(
             this.games[this.userIdToGameIdx.get(userId)].players[0],
           );
+          this.emitGameInviteUpdate(
+            this.getByValue(
+              this.subSockToUserId,
+              this.games[this.userIdToGameIdx.get(userId)].privateList[1],
+            ),
+          );
         }
-        this.emitGameInviteUpdate(
-          this.getByValue(
-            this.subSockToUserId,
-            this.games[this.userIdToGameIdx.get(userId)].privateList[1],
-          ),
-        );
+
         this.games[this.userIdToGameIdx.get(userId)].players = ['-1', '-1']; //.push('-1');
         this.games[this.userIdToGameIdx.get(userId)].setState(4);
         this.userIdToGameIdx.delete(userId);
@@ -431,11 +432,11 @@ export class AppGateway
           socket.emit('invalidInvitation');
           return;
         } else if (payload.custom?.invitation) {
-          this.emitGameInviteUpdate(
-            this.invitationToUserId.get(payload.custom?.invitation),
-          );
           this.invitationToGameIdx.delete(payload.custom?.invitation);
           this.invitationToUserId.delete(payload.custom?.invitation);
+          this.emitGameInviteUpdate(
+            this.getByValue(this.subSockToUserId, userId),
+          );
         }
         this.games[ltsIdx].addPlayer(socket.id, (socket.request as any).user);
         socket.join(this.games[ltsIdx].room);
