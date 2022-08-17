@@ -26,6 +26,7 @@ export class UpdateGameDto {
 
   winner?: string;
 }
+
 @Injectable()
 export class GameService {
   async newGame(

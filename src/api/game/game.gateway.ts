@@ -413,12 +413,15 @@ export class AppGateway
       payload.custom?.invitation &&
       !this.invitationToGameIdx.has(payload.custom.invitation)
     ) {
+      console.log("invalid invite", payload.custom)
       socket.emit('invalidInvitation');
       return;
     }
+    console.log("new invitation")
     if (this.games.length) {
       console.log(ltsIdx);
       if (
+        !payload.custom.opponent &&
         ltsIdx != undefined &&
         this.games[ltsIdx] != undefined &&
         this.games[ltsIdx].getPlayers().length < 2
@@ -429,6 +432,7 @@ export class AppGateway
             this.games[ltsIdx].privateList.includes(userId)
           )
         ) {
+          console.log("invalid invite", payload.custom)
           socket.emit('invalidInvitation');
           return;
         } else if (payload.custom?.invitation) {
@@ -461,9 +465,10 @@ export class AppGateway
           },
         );
       } else {
+        console.log("game create idx ",this.games.length - 1)
+
         const g = this.newGame(this.server, payload.mode);
         if (!g) return;
-
         this.games.push(g);
         this.games[this.games.length - 1].addPlayer(
           socket.id,
@@ -492,7 +497,6 @@ export class AppGateway
     } else {
       const g = this.newGame(this.server, payload.mode);
       if (!g) return;
-
       this.games.push(g);
       this.games[0].addPlayer(socket.id, (socket.request as any).user);
       if (payload.custom) {
