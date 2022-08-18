@@ -417,11 +417,11 @@ export class AppGateway
       socket.emit('invalidInvitation');
       return;
     }
-    console.log("new invitation")
+
     if (this.games.length) {
       console.log(ltsIdx);
       if (
-        !payload.custom.opponent &&
+        !payload.custom?.opponent &&
         ltsIdx != undefined &&
         this.games[ltsIdx] != undefined &&
         this.games[ltsIdx].getPlayers().length < 2
