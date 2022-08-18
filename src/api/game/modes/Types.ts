@@ -76,7 +76,7 @@ export class DoublePaddleConfig {
 
 export class GoalKeeperConfig {
   borderSize = 0.1; // % of height
-  goalSize = 0.3;
+  goalSize = 0.5;
 }
 export interface GameState {
   mode: string; //gamemode

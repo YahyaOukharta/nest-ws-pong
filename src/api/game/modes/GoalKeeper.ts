@@ -29,7 +29,7 @@ export class GoalKeeper extends Game {
     this.ballDirY = -1;
 
     this.paddleWidth = 30;
-    this.paddleHeight = 150;
+    this.paddleHeight = 100;
     this.paddleSpeed = 5;
     this.paddleOneX = this.height * this.gameModeConfig.borderSize;
     this.paddleOneY = this.height * this.gameModeConfig.borderSize;
