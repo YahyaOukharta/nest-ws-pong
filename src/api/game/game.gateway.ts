@@ -98,6 +98,23 @@ export class AppGateway
     console.log('new client', client.id, (client.request as any).user);
   }
 
+  @SubscribeMessage('spectate')
+  async onSpectate(
+    client: AuthenticatedSocket,
+    payload: { gameId: string },
+  ): Promise<void> {
+    const g = this.games.filter((g) => {
+      return !g.done && !g.gameOver() && g.room == payload.gameId;
+    });
+    if (g.length != 1) {
+      console.log(g);
+      console.log('game doesnt exist');
+      client.emit('invalidSpectate');
+      return;
+    }
+    client.join(g[0].room);
+  }
+
   @SubscribeMessage('subscribeGameInvites')
   async onSubscribeGameInvites(client: AuthenticatedSocket): Promise<void> {
     console.log('Subscribed to GAME INVITES', client.id);
@@ -413,7 +430,7 @@ export class AppGateway
       payload.custom?.invitation &&
       !this.invitationToGameIdx.has(payload.custom.invitation)
     ) {
-      console.log("invalid invite", payload.custom)
+      console.log('invalid invite', payload.custom);
       socket.emit('invalidInvitation');
       return;
     }
@@ -432,7 +449,7 @@ export class AppGateway
             this.games[ltsIdx].privateList.includes(userId)
           )
         ) {
-          console.log("invalid invite", payload.custom)
+          console.log('invalid invite', payload.custom);
           socket.emit('invalidInvitation');
           return;
         } else if (payload.custom?.invitation) {
@@ -465,7 +482,7 @@ export class AppGateway
           },
         );
       } else {
-        console.log("game create idx ",this.games.length - 1)
+        console.log('game create idx ', this.games.length - 1);
 
         const g = this.newGame(this.server, payload.mode);
         if (!g) return;
