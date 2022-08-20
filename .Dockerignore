@@ -1,0 +1,10 @@
+dist
+node_modules
+src
+static
+test
+.*
+package*
+tsconfig*
+README.md
+nest-cli.json
