@@ -35,8 +35,8 @@ export class GameService {
     data: CreateGameDto,
   ): Promise<CreateGameDto | false> {
     try {
-      const res = await axios.post('http://localhost:3500/game', data, {
-        // http://localhost:3500 when docker compose
+      const res = await axios.post('http://users:3500/game', data, {
+        // http://users:3500 when docker compose
         headers: { cookie, authorization },
       });
       console.log('game created > ', res.data);
@@ -53,8 +53,8 @@ export class GameService {
     data: UpdateGameDto,
   ): Promise<CreateGameDto | false> {
     try {
-      const res = await axios.post('http://localhost:3500/game/' + gameId, data, {
-        // http://localhost:3500 when docker compose
+      const res = await axios.post('http://users:3500/game/' + gameId, data, {
+        // http://users:3500 when docker compose
         headers: { cookie, authorization },
       });
       console.log('game updated > ', res.data);

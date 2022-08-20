@@ -125,7 +125,7 @@ export class AppGateway
       this.subSockToUserId.delete(e);
     });
     this.subSockToUserId.set(client.id, (client.request as any).user.uid);
-    this.emitGameInviteUpdate(client.id);
+    //this.emitGameInviteUpdate(client.id);
   }
 
   async emitGameInviteUpdate(socketId: string): Promise<void> {
@@ -140,6 +140,13 @@ export class AppGateway
         return { userId: this.socketToUserId.get(i), invitation: i };
       }),
     });
+  }
+  async emitGameInvite(
+    receiver: string,
+    data: { invitation: string; userId: string },
+  ): Promise<void> {
+    const receiverSock = this.getByValue(this.subSockToUserId, receiver);
+    this.server.to(receiverSock).emit('gameInvitesUpdate', data);
   }
 
   @SubscribeMessage('initGame')
@@ -455,9 +462,13 @@ export class AppGateway
         } else if (payload.custom?.invitation) {
           this.invitationToGameIdx.delete(payload.custom?.invitation);
           this.invitationToUserId.delete(payload.custom?.invitation);
-          this.emitGameInviteUpdate(
-            this.getByValue(this.subSockToUserId, userId),
-          );
+          // this.emitGameInviteUpdate(
+          //   this.getByValue(this.subSockToUserId, userId),
+          // );
+          // this.emitGameInvite(userId, {
+          //   invitation: payload.custom?.invitation,
+          //   userId: this.socketToUserId.get(payload.custom?.invitation),
+          // });
         }
         this.games[ltsIdx].addPlayer(socket.id, (socket.request as any).user);
         socket.join(this.games[ltsIdx].room);
@@ -501,9 +512,10 @@ export class AppGateway
           this.invitationToGameIdx.set(roomName, this.games.length - 1);
           this.invitationToUserId.set(roomName, payload.custom.opponent);
 
-          this.emitGameInviteUpdate(
-            this.getByValue(this.subSockToUserId, payload.custom.opponent),
-          );
+          this.emitGameInvite(payload.custom.opponent, {
+            invitation: roomName,
+            userId: userId,
+          });
         }
         socket.join(roomName);
         console.log('Created game idx=' + (this.games.length - 1), roomName);
@@ -521,9 +533,10 @@ export class AppGateway
         this.invitationToGameIdx.set(roomName, 0);
         this.invitationToUserId.set(roomName, payload.custom.opponent);
 
-        this.emitGameInviteUpdate(
-          this.getByValue(this.subSockToUserId, payload.custom.opponent),
-        );
+        this.emitGameInvite(payload.custom.opponent, {
+          invitation: roomName,
+          userId: userId,
+        });
       }
       this.games[0].setRoomName(roomName);
       socket.join(roomName);
