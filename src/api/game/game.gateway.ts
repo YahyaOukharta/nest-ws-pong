@@ -98,6 +98,15 @@ export class AppGateway
     console.log('new client', client.id, (client.request as any).user);
   }
 
+  // Real time user state
+  async emitUserStatusUpdate(data: {
+    userId: string;
+    status: string;
+  }): Promise<void> {
+    this.server.emit('userStatusUpdate', data);
+  }
+
+  //SPECTATING
   @SubscribeMessage('spectate')
   async onSpectate(
     client: AuthenticatedSocket,
@@ -115,6 +124,7 @@ export class AppGateway
     client.join(g[0].room);
   }
 
+  //GAME INVITES
   @SubscribeMessage('subscribeGameInvites')
   async onSubscribeGameInvites(client: AuthenticatedSocket): Promise<void> {
     console.log('Subscribed to GAME INVITES', client.id);
@@ -125,22 +135,13 @@ export class AppGateway
       this.subSockToUserId.delete(e);
     });
     this.subSockToUserId.set(client.id, (client.request as any).user.uid);
+
+    this.emitUserStatusUpdate({
+      userId: (client.request as any).user.uid,
+      status: 'online',
+    });
     //this.emitGameInviteUpdate(client.id);
   }
-
-  // async emitGameInviteUpdate(socketId: string): Promise<void> {
-  //   if (!this.subSockToUserId.has(socketId)) return;
-  //   console.log('EMITING');
-
-  //   this.server.to(socketId).emit('gameInvitesUpdate', {
-  //     data: this.getAllByValue(
-  //       this.invitationToUserId,
-  //       this.subSockToUserId.get(socketId),
-  //     ).map((i) => {
-  //       return { userId: this.socketToUserId.get(i), invitation: i };
-  //     }),
-  //   });
-  // }
 
   async emitGameInvite(
     receiver: string,
@@ -161,6 +162,7 @@ export class AppGateway
     //this.emitGameInviteUpdate(client.id);
   }
 
+  //GAME CORE
   @SubscribeMessage('initGame')
   async onInitGame(client: AuthenticatedSocket): Promise<void> {
     const user = (client.request as any).user;
@@ -226,6 +228,11 @@ export class AppGateway
   }
   async handleDisconnect(client: Socket): Promise<void> {
     this.logger.log('Client Disconnected :' + client.id);
+    if (this.subSockToUserId.has(client.id))
+      this.emitUserStatusUpdate({
+        userId: (client.request as any).user.uid,
+        status: 'offline',
+      });
 
     const userId = this.socketToUserId.get(client.id);
     if (this.userIdToGameIdx.has(userId)) {
@@ -311,6 +318,7 @@ export class AppGateway
             this.games[this.userIdToGameIdx.get(userId)].setDone(true);
             this.userIdToGameIdx.delete(this.socketToUserId.get(p[0]));
             this.userIdToGameIdx.delete(this.socketToUserId.get(p[1]));
+
             //creating game on db
             await this.gameService.updateGame(
               client.request.headers.cookie,
@@ -324,6 +332,15 @@ export class AppGateway
                 winner: g.winner ? this.socketToUserId.get(g.winner) : null,
               },
             );
+            this.emitUserStatusUpdate({
+              userId: this.socketToUserId.get(g.players[0]),
+              status: 'online',
+            });
+            this.emitUserStatusUpdate({
+              userId: this.socketToUserId.get(g.players[1]),
+              status: 'online',
+            });
+
             //this.socketToUserId.delete(client.id);
             this.userIdToTimeout.delete(userId);
             // this.games[this.userIdToGameIdx.get(userId)].setTimeout(userId, false);
@@ -357,6 +374,15 @@ export class AppGateway
               : null,
           },
         );
+        const g = this.games[idx];
+        this.emitUserStatusUpdate({
+          userId: this.socketToUserId.get(g.players[0]),
+          status: 'online',
+        });
+        this.emitUserStatusUpdate({
+          userId: this.socketToUserId.get(g.players[1]),
+          status: 'online',
+        });
       }
     }
 
@@ -427,6 +453,14 @@ export class AppGateway
             winner: g.winner ? this.socketToUserId.get(g.winner) : null,
           },
         );
+        this.emitUserStatusUpdate({
+          userId: this.socketToUserId.get(g.players[0]),
+          status: 'online',
+        });
+        this.emitUserStatusUpdate({
+          userId: this.socketToUserId.get(g.players[1]),
+          status: 'online',
+        });
         //this.socketToUserId.delete(client.id);
         this.userIdToTimeout.delete(userId);
       } else return;
@@ -504,6 +538,14 @@ export class AppGateway
             status: 0,
           },
         );
+        this.emitUserStatusUpdate({
+          userId: this.socketToUserId.get(g.players[0]),
+          status: 'playing',
+        });
+        this.emitUserStatusUpdate({
+          userId: this.socketToUserId.get(g.players[1]),
+          status: 'playing',
+        });
       } else {
         console.log('game create idx ', this.games.length - 1);
 
