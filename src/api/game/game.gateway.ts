@@ -128,19 +128,19 @@ export class AppGateway
     //this.emitGameInviteUpdate(client.id);
   }
 
-  async emitGameInviteUpdate(socketId: string): Promise<void> {
-    if (!this.subSockToUserId.has(socketId)) return;
-    console.log('EMITING');
+  // async emitGameInviteUpdate(socketId: string): Promise<void> {
+  //   if (!this.subSockToUserId.has(socketId)) return;
+  //   console.log('EMITING');
 
-    this.server.to(socketId).emit('gameInvitesUpdate', {
-      data: this.getAllByValue(
-        this.invitationToUserId,
-        this.subSockToUserId.get(socketId),
-      ).map((i) => {
-        return { userId: this.socketToUserId.get(i), invitation: i };
-      }),
-    });
-  }
+  //   this.server.to(socketId).emit('gameInvitesUpdate', {
+  //     data: this.getAllByValue(
+  //       this.invitationToUserId,
+  //       this.subSockToUserId.get(socketId),
+  //     ).map((i) => {
+  //       return { userId: this.socketToUserId.get(i), invitation: i };
+  //     }),
+  //   });
+  // }
   async emitGameInvite(
     receiver: string,
     data: { invitation: string; userId: string },
@@ -225,12 +225,12 @@ export class AppGateway
           this.invitationToUserId.delete(
             this.games[this.userIdToGameIdx.get(userId)].players[0],
           );
-          this.emitGameInviteUpdate(
-            this.getByValue(
-              this.subSockToUserId,
-              this.games[this.userIdToGameIdx.get(userId)].privateList[1],
-            ),
-          );
+          // this.emitGameInviteUpdate(
+          //   this.getByValue(
+          //     this.subSockToUserId,
+          //     this.games[this.userIdToGameIdx.get(userId)].privateList[1],
+          //   ),
+          // );
         }
 
         this.games[this.userIdToGameIdx.get(userId)].players = ['-1', '-1']; //.push('-1');
