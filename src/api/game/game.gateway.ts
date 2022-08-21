@@ -28,6 +28,7 @@ interface PlayerJoinedPayload {
 interface AuthenticatedSocket extends Socket {
   user: User;
 }
+type UserStatusString = 'online' | 'offline' | 'playing' | 'spectating';
 
 @WebSocketGateway({
   pingTimeout: 7000,
@@ -101,7 +102,7 @@ export class AppGateway
   // Real time user state
   async emitUserStatusUpdate(data: {
     userId: string;
-    status: string;
+    status: UserStatusString;
   }): Promise<void> {
     this.server.emit('userStatusUpdate', data);
   }
