@@ -141,12 +141,24 @@ export class AppGateway
   //     }),
   //   });
   // }
+
   async emitGameInvite(
     receiver: string,
     data: { invitation: string; userId: string },
   ): Promise<void> {
     const receiverSock = this.getByValue(this.subSockToUserId, receiver);
     this.server.to(receiverSock).emit('gameInvitesUpdate', data);
+  }
+
+  @SubscribeMessage('declineInvitation')
+  async onDeclineInvitation(
+    client: AuthenticatedSocket,
+    payload: { invitation: string },
+  ): Promise<void> {
+    console.log('Subscribed to GAME INVITES', client.id);
+
+    this.server.to(payload.invitation).emit('invalidInvitation');
+    //this.emitGameInviteUpdate(client.id);
   }
 
   @SubscribeMessage('initGame')

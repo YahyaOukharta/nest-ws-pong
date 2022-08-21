@@ -64,7 +64,7 @@ export class GameService {
       console.log('game updated > ', res.data);
       return res.data;
     } catch (e) {
-      //console.log(e);
+      console.log('couldnt update game', e);
       return false;
     }
   }
