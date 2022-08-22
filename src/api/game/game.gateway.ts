@@ -76,6 +76,7 @@ export class AppGateway
   private invitationToUserId: Map<string, string> = new Map<string, string>();
 
   private subSockToUserId: Map<string, string> = new Map<string, string>();
+  private spectatorToGameIdx: Map<string, string> = new Map<string, string>();
 
   afterInit(server: Server): void {
     this.server = server;
@@ -136,6 +137,11 @@ export class AppGateway
       client.emit('invalidSpectate');
       return;
     }
+    this.spectatorToGameIdx.set(client.id, g[0].room);
+    this.emitUserStatusUpdate(client, {
+      userId: (client.request as any).user.uid,
+      status: 'spectating',
+    });
     client.join(g[0].room);
   }
 
@@ -248,6 +254,14 @@ export class AppGateway
         userId: (client.request as any).user.uid,
         status: 'offline',
       });
+    if (this.spectatorToGameIdx.has(client.id)) {
+      this.spectatorToGameIdx.delete(client.id);
+      this.emitUserStatusUpdate(client, {
+        userId: (client.request as any).user.uid,
+        status: 'online',
+      });
+      return;
+    }
 
     const userId = this.socketToUserId.get(client.id);
     if (this.userIdToGameIdx.has(userId)) {
