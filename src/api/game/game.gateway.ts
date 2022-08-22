@@ -54,6 +54,7 @@ export class AppGateway
 {
   constructor(
     @Inject('GAME_SERVICE') private readonly gameService: GameService,
+    @Inject('AUTH_SERVICE') private readonly authService: AuthService,
   ) {}
   private server: Server;
   private logger: Logger = new Logger('AppGateway');
@@ -100,11 +101,24 @@ export class AppGateway
   }
 
   // Real time user state
-  async emitUserStatusUpdate(data: {
-    userId: string;
-    status: UserStatusString;
-  }): Promise<void> {
+  async emitUserStatusUpdate(
+    socket: Socket,
+    data: {
+      userId: string;
+      status: UserStatusString;
+    },
+  ): Promise<void> {
     this.server.emit('userStatusUpdate', data);
+    try {
+      await this.authService.updateUserStatus(
+        socket.request.headers.cookie,
+        socket.request.headers.authorization,
+        data.userId,
+        data.status,
+      );
+    } catch (e) {
+      console.log('couldnt update user status in db');
+    }
   }
 
   //SPECTATING
@@ -137,7 +151,7 @@ export class AppGateway
     });
     this.subSockToUserId.set(client.id, (client.request as any).user.uid);
 
-    this.emitUserStatusUpdate({
+    this.emitUserStatusUpdate(client, {
       userId: (client.request as any).user.uid,
       status: 'online',
     });
@@ -230,7 +244,7 @@ export class AppGateway
   async handleDisconnect(client: Socket): Promise<void> {
     this.logger.log('Client Disconnected :' + client.id);
     if (this.subSockToUserId.has(client.id))
-      this.emitUserStatusUpdate({
+      this.emitUserStatusUpdate(client, {
         userId: (client.request as any).user.uid,
         status: 'offline',
       });
@@ -314,12 +328,6 @@ export class AppGateway
               p.indexOf(client.id),
             );
 
-            this.games[this.userIdToGameIdx.get(userId)].setState(4);
-            this.games[this.userIdToGameIdx.get(userId)].players = ['-1', '-1']; //.push('-1');
-            this.games[this.userIdToGameIdx.get(userId)].setDone(true);
-            this.userIdToGameIdx.delete(this.socketToUserId.get(p[0]));
-            this.userIdToGameIdx.delete(this.socketToUserId.get(p[1]));
-
             //creating game on db
             await this.gameService.updateGame(
               client.request.headers.cookie,
@@ -333,14 +341,20 @@ export class AppGateway
                 winner: g.winner ? this.socketToUserId.get(g.winner) : null,
               },
             );
-            this.emitUserStatusUpdate({
+            this.emitUserStatusUpdate(client, {
               userId: this.socketToUserId.get(g.players[0]),
               status: 'online',
             });
-            this.emitUserStatusUpdate({
+            this.emitUserStatusUpdate(client, {
               userId: this.socketToUserId.get(g.players[1]),
               status: 'online',
             });
+
+            this.games[this.userIdToGameIdx.get(userId)].setState(4);
+            this.games[this.userIdToGameIdx.get(userId)].players = ['-1', '-1']; //.push('-1');
+            this.games[this.userIdToGameIdx.get(userId)].setDone(true);
+            this.userIdToGameIdx.delete(this.socketToUserId.get(p[0]));
+            this.userIdToGameIdx.delete(this.socketToUserId.get(p[1]));
 
             //this.socketToUserId.delete(client.id);
             this.userIdToTimeout.delete(userId);
@@ -376,11 +390,12 @@ export class AppGateway
           },
         );
         const g = this.games[idx];
-        this.emitUserStatusUpdate({
+        console.log(g);
+        this.emitUserStatusUpdate(client, {
           userId: this.socketToUserId.get(g.players[0]),
           status: 'online',
         });
-        this.emitUserStatusUpdate({
+        this.emitUserStatusUpdate(client, {
           userId: this.socketToUserId.get(g.players[1]),
           status: 'online',
         });
@@ -435,12 +450,6 @@ export class AppGateway
           p.indexOf(socket.id),
         );
 
-        this.games[this.userIdToGameIdx.get(userId)].setState(4);
-        this.games[this.userIdToGameIdx.get(userId)].players = ['-1', '-1']; //.push('-1');
-        this.games[this.userIdToGameIdx.get(userId)].setDone(true);
-        this.userIdToGameIdx.delete(this.socketToUserId.get(p[0]));
-        this.userIdToGameIdx.delete(this.socketToUserId.get(p[1]));
-
         //creating game on db
         await this.gameService.updateGame(
           socket.request.headers.cookie,
@@ -454,14 +463,21 @@ export class AppGateway
             winner: g.winner ? this.socketToUserId.get(g.winner) : null,
           },
         );
-        this.emitUserStatusUpdate({
+        this.emitUserStatusUpdate(socket, {
           userId: this.socketToUserId.get(g.players[0]),
           status: 'online',
         });
-        this.emitUserStatusUpdate({
+        this.emitUserStatusUpdate(socket, {
           userId: this.socketToUserId.get(g.players[1]),
           status: 'online',
         });
+
+        this.games[this.userIdToGameIdx.get(userId)].setState(4);
+        this.games[this.userIdToGameIdx.get(userId)].players = ['-1', '-1']; //.push('-1');
+        this.games[this.userIdToGameIdx.get(userId)].setDone(true);
+        this.userIdToGameIdx.delete(this.socketToUserId.get(p[0]));
+        this.userIdToGameIdx.delete(this.socketToUserId.get(p[1]));
+
         //this.socketToUserId.delete(client.id);
         this.userIdToTimeout.delete(userId);
       } else return;
@@ -539,11 +555,11 @@ export class AppGateway
             status: 0,
           },
         );
-        this.emitUserStatusUpdate({
+        this.emitUserStatusUpdate(socket, {
           userId: this.socketToUserId.get(g.players[0]),
           status: 'playing',
         });
-        this.emitUserStatusUpdate({
+        this.emitUserStatusUpdate(socket, {
           userId: this.socketToUserId.get(g.players[1]),
           status: 'playing',
         });

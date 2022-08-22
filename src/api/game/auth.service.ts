@@ -24,10 +24,31 @@ export class AuthService {
     authorization: string,
   ): Promise<false | User> {
     try {
-      const res = await axios.get('http://users:3500/user', {
+      const res = await axios.get('http://localhost:3500/user', {
         // http://users:3500 when docker compose
         headers: { cookie, authorization },
       });
+      return res.data;
+    } catch (e) {
+      //console.log(e);
+      return false;
+    }
+  }
+  async updateUserStatus(
+    cookie: string,
+    authorization: string,
+    uid: string,
+    status: string,
+  ): Promise<false | User> {
+    try {
+      const res = await axios.patch(
+        'http://localhost:3500/user',
+        { uid, status },
+        {
+          // http://users:3500 when docker compose
+          headers: { cookie, authorization },
+        },
+      );
       return res.data;
     } catch (e) {
       //console.log(e);
