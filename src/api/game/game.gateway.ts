@@ -363,10 +363,14 @@ export class AppGateway
               userId: this.socketToUserId.get(g.players[1]),
               status: 'online',
             });
-
-            this.games[this.userIdToGameIdx.get(userId)].setState(4);
-            this.games[this.userIdToGameIdx.get(userId)].players = ['-1', '-1']; //.push('-1');
-            this.games[this.userIdToGameIdx.get(userId)].setDone(true);
+            if (this.userIdToGameIdx.has(userId)) {
+              this.games[this.userIdToGameIdx.get(userId)].setState(4);
+              this.games[this.userIdToGameIdx.get(userId)].players = [
+                '-1',
+                '-1',
+              ]; //.push('-1');
+              this.games[this.userIdToGameIdx.get(userId)].setDone(true);
+            }
             this.userIdToGameIdx.delete(this.socketToUserId.get(p[0]));
             this.userIdToGameIdx.delete(this.socketToUserId.get(p[1]));
 
