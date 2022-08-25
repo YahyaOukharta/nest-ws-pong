@@ -166,7 +166,7 @@ export class AppGateway
 
   async emitGameInvite(
     receiver: string,
-    data: { invitation: string; userId: string },
+    data: { invitation: string; userId: string; username: string },
   ): Promise<void> {
     const receiverSock = this.getByValue(this.subSockToUserId, receiver);
     this.server.to(receiverSock).emit('gameInvitesUpdate', data);
@@ -498,7 +498,15 @@ export class AppGateway
 
         //this.socketToUserId.delete(client.id);
         this.userIdToTimeout.delete(userId);
-      } else return;
+      } else {
+        const g = this.games[this.userIdToGameIdx.get(userId)];
+
+        const room = g.room;
+        this.server.to(room).emit('roomName', {
+          roomName: room,
+        });
+        return;
+      }
     }
     //console.log(socket.user);
     if (payload.custom?.opponent) {
@@ -553,6 +561,7 @@ export class AppGateway
         }
         this.games[ltsIdx].addPlayer(socket.id, (socket.request as any).user);
         socket.join(this.games[ltsIdx].room);
+
         console.log('Joined game idx=' + ltsIdx, roomName); // not this room
         this.userIdToGameIdx.set(userId, ltsIdx);
 
@@ -581,6 +590,10 @@ export class AppGateway
           userId: this.socketToUserId.get(g.players[1]),
           status: 'playing',
         });
+        const room = g.room;
+        this.server.to(room).emit('roomName', {
+          roomName: room,
+        });
       } else {
         console.log('game create idx ', this.games.length - 1);
 
@@ -604,6 +617,7 @@ export class AppGateway
           this.emitGameInvite(payload.custom.opponent, {
             invitation: roomName,
             userId: userId,
+            username: (socket.request as any).user.username,
           });
         }
         socket.join(roomName);
@@ -625,6 +639,7 @@ export class AppGateway
         this.emitGameInvite(payload.custom.opponent, {
           invitation: roomName,
           userId: userId,
+          username: (socket.request as any).user.username,
         });
       }
       this.games[0].setRoomName(roomName);
