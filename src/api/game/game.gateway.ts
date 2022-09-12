@@ -270,9 +270,20 @@ export class AppGateway
         this.games[this.userIdToGameIdx.get(userId)].getPlayers().length < 2
       ) {
         if (this.games[this.userIdToGameIdx.get(userId)].privateList?.length) {
-          this.invitationToUserId.delete(
-            this.games[this.userIdToGameIdx.get(userId)].players[0],
-          );
+          {
+            this.server
+              .to(
+                this.getByValue(
+                  this.subSockToUserId,
+                  this.games[this.userIdToGameIdx.get(userId)].privateList[1],
+                ),
+              )
+              .emit('invitationCanceled');
+
+            this.invitationToUserId.delete(
+              this.games[this.userIdToGameIdx.get(userId)].players[0],
+            );
+          }
           // this.emitGameInviteUpdate(
           //   this.getByValue(
           //     this.subSockToUserId,
@@ -522,9 +533,11 @@ export class AppGateway
     const ltsIdx = payload.custom?.invitation
       ? this.invitationToGameIdx.get(payload.custom.invitation)
       : this.gameModeToLatestGameIdx.get(payload.mode);
+
     if (
       payload.custom?.invitation &&
-      !this.invitationToGameIdx.has(payload.custom.invitation)
+      (!this.invitationToGameIdx.has(payload.custom.invitation) ||
+        !this.invitationToUserId.has(payload.custom.invitation))
     ) {
       console.log('invalid invite', payload.custom);
       socket.emit('invalidInvitation');
