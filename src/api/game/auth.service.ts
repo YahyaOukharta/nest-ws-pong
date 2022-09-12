@@ -42,7 +42,7 @@ export class AuthService {
   ): Promise<false | User> {
     try {
       const res = await axios.patch(
-        'http://users:3500/user',
+        'http://users:3500/user/status',
         { uid, status },
         {
           // http://users:3500 when docker compose
@@ -51,7 +51,7 @@ export class AuthService {
       );
       return res.data;
     } catch (e) {
-      //console.log(e);
+      console.log(e);
       return false;
     }
   }
