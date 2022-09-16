@@ -15,13 +15,13 @@ async function bootstrap() {
       new FastifyAdapter(),
       {
         cors: {
-          origin: ['http://localhost:8000','http://localhost'],
+          origin: ['http://localhost:8000', 'http://localhost'],
           credentials: true,
         },
       },
     );
   // const config: ConfigService = app.get(ConfigService);
-  const port = 3001
+  const port = 3001;
   // app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   await app.listen(port, '0.0.0.0', () => {
