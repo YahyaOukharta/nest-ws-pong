@@ -4,7 +4,6 @@ src
 static
 test
 .*
-package*
 tsconfig*
 README.md
 nest-cli.json
