@@ -34,7 +34,9 @@ type UserStatusString = 'online' | 'offline' | 'playing' | 'spectating';
   pingTimeout: 7000,
   pingInterval: 1000,
   cors: {
-    origin: ['http://localhost', 'http://localhost:8000'],
+    origin: [
+      (process.env.CORS || 'http://localhost'),
+    ],
     credentials: true,
   },
   async allowRequest(req, fn) {

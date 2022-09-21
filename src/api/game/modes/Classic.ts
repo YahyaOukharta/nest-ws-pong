@@ -20,7 +20,7 @@ export class ClassicGame extends Game {
     this.initBallX = this.width / 2;
     this.initBallY = this.height / 2;
     this.ballRadius = 25;
-    this.ballSpeed = 10;
+    this.ballSpeed = 5;
     this.ballX = this.initBallX;
     this.ballY = this.initBallY;
     this.ballDirX = -1;
@@ -38,7 +38,7 @@ export class ClassicGame extends Game {
 
     this.players = [];
     this.scores = [0, 0];
-    this.maxScore = 3;
+    this.maxScore = 10;
     this.room = '';
 
     this.done = false;
