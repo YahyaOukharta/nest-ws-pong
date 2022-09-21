@@ -158,7 +158,6 @@ export class ClassicGame extends Game {
   }
   replacePlayer(oldSock: string, newSock: string) {
     const idx = this.players.indexOf(oldSock);
-    // console.log("old sock ", oldSock, "new sock " , newSock, idx)
     this.players[idx] = newSock;
   }
   gameOver(): boolean {
@@ -223,7 +222,6 @@ export class ClassicGame extends Game {
       this.ballY > this.paddleOneY &&
       this.ballY < this.paddleOneY + this.paddleHeight // ball in front of paddle and going toward paddle
     ) {
-      // console.log("in paddle one range")
       this.ballX = max(this.ballX, this.ballRadius + this.paddleWidth);
       if (this.ballX - this.ballRadius - this.paddleWidth <= 0)
         this.ballDirX *= -1;

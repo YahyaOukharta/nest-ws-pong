@@ -30,7 +30,6 @@ export class AuthService {
       });
       return res.data;
     } catch (e) {
-      //console.log(e);
       return false;
     }
   }
@@ -51,7 +50,6 @@ export class AuthService {
       );
       return res.data;
     } catch (e) {
-      console.log(e);
       return false;
     }
   }

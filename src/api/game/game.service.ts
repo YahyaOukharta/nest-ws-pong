@@ -42,7 +42,6 @@ export class GameService {
       console.log('game created > ', res.data);
       return res.data;
     } catch (e) {
-      //console.log(e);
       return false;
     }
   }
@@ -60,7 +59,15 @@ export class GameService {
       console.log('game updated > ', res.data);
       return res.data;
     } catch (e) {
-      console.log('couldnt update game', e);
+      return false;
+    }
+  }
+  async clearCurrentGames() {
+    // status: string, // uid: string, // authorization: string, // cookie: string,
+    try {
+      const res = await axios.delete('http://users:3500/game');
+      return res.data;
+    } catch (e) {
       return false;
     }
   }
