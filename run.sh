@@ -1,9 +1,3 @@
-if [ -d "node_modules" ]; then
-  rm -rf node_modules dist
-fi
-
-npm install
-
 if [ "$ENVIRONMENT" == "production" ]; then
   echo 'Run Production';
   npm run build
